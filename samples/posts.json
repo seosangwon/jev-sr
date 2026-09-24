@@ -1,0 +1,14 @@
+[
+  {"name":"급여 마감 중단","post":{"targetInfo":"인사팀 급여 담당자","title":"급여 계산이 멈췄습니다","content":"급여 계산이 처리 중에서 넘어가지 않아 오늘 마감 업무를 진행할 수 없습니다."},"level":"level_1","scope":"team","signals":[0.94,0.86,0.92]},
+  {"name":"다수 사용자 승인 장애","post":{"targetInfo":"재무팀 전체","title":"결재 문서 승인이 되지 않습니다","content":"여러 팀원이 승인 버튼을 눌러도 처리되지 않아 결재 업무가 지연되고 있습니다."},"level":"level_2","scope":"team","signals":[0.02,0.84,0.81]},
+  {"name":"우회 가능한 검색 문제","post":{"targetInfo":"영업팀 사용자","title":"고객 검색 조건이 초기화됩니다","content":"검색 조건이 가끔 초기화되지만 다시 입력하면 조회할 수 있습니다."},"level":"level_3","scope":"individual","signals":[0.01,0.18,0.12]},
+  {"name":"급여 조회 방법 문의","post":{"targetInfo":"전체 임직원","title":"급여 명세서 조회 방법 문의","content":"지난달 급여 명세서는 어느 메뉴에서 확인할 수 있나요?"},"level":"level_4","scope":"unknown","signals":[0.01,0.02,0.02]},
+  {"name":"필수 기능 전면 중단","post":{"targetInfo":"전체 임직원","title":"모든 필수 업무 기능이 멈췄습니다","content":"전 직원이 필수 업무 화면을 열 수 없고 어떤 작업도 진행할 수 없습니다."},"level":"level_1","scope":"organization_wide","signals":[0.12,0.98,0.98]},
+  {"name":"UI 색상 문제","post":{"targetInfo":"사내 포털 사용자","title":"메뉴 글자 색상 개선 요청","content":"메뉴의 글자가 흐린 회색입니다. 기능은 정상이며 글자 색상을 진하게 바꿔 주세요."},"level":"level_4","scope":"unknown","signals":[0.01,0.01,0.01]},
+  {"name":"긴급 제목의 단순 문의","post":{"targetInfo":"사용 안내 담당 팀","title":"긴급! 도움말 위치 문의","content":"서비스는 정상적으로 사용 중입니다. 도움말 메뉴는 어디에 있나요?"},"level":"level_4","scope":"individual","signals":[0.01,0.01,0.02]},
+  {"name":"오류라는 단어 없는 업무 중단","post":{"targetInfo":"인사팀 급여 담당자","title":"급여 지급이 진행되지 않습니다","content":"지급 처리 화면이 계속 멈춰 있어 오늘 급여를 보낼 수 없습니다. 모든 지급 업무가 중단됐습니다."},"level":"level_1","scope":"team","signals":[0.98,0.93,0.97]},
+  {"name":"전체 대상 단순 공지 요청","post":{"targetInfo":"전체 임직원","title":"사용 안내 공지 요청","content":"업무는 정상적으로 진행하고 있습니다. 새 사용 안내를 공지해 주세요."},"level":"level_4","scope":"unknown","signals":[0.01,0.01,0.01]},
+  {"name":"모호한 내용 / 낮은 신뢰도","post":{"targetInfo":"담당 팀","title":"확인 요청","content":"이상합니다."},"level":"level_3","scope":"unknown","signals":[0.4,0.5,0.5],"confidence":0.35},
+  {"name":"한글·영문·특수문자 혼합","post":{"targetInfo":"QA 테스트 팀","title":"Report v2 검색 조건 (#42) 초기화","content":"Filter가 초기화됩니다! 2026-09 데이터는 다시 입력하면 조회 가능하며 업무는 계속할 수 있습니다."},"level":"level_3","scope":"team","signals":[0.01,0.15,0.1]},
+  {"name":"여러 팀 주요 기능 장애","post":{"targetInfo":"재무팀 및 구매팀","title":"주요 결재 기능 처리 지연","content":"여러 팀의 다수 사용자가 결재 승인을 완료하지 못해 주요 업무 진행이 크게 제한되고 있습니다."},"level":"level_2","scope":"many_users","signals":[0.02,0.88,0.86]}
+]
