@@ -16,7 +16,7 @@ function compareNewest(a: QueryRecord, b: QueryRecord): number {
 export function sortQueryRecords(records: QueryRecord[], sort: QuerySort): QueryRecord[] {
   return [...records].sort((a, b) => {
     if (sort === 'priority') {
-      const levelDifference = Number(a.analysis.priority.level.slice(-1)) - Number(b.analysis.priority.level.slice(-1));
+      const levelDifference = Number(a.analysis.handlingPriority.level.slice(-1)) - Number(b.analysis.handlingPriority.level.slice(-1));
       if (levelDifference) return levelDifference;
     }
     return compareNewest(a, b);

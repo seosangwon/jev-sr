@@ -1,16 +1,17 @@
-import { useState } from 'react';
 import { labels } from './api';
 import { sortQueryRecords, type QueryRecord, type QuerySort } from './history';
 
 type Props = {
   records: QueryRecord[];
+  sort: QuerySort;
+  onSortChange: (sort: QuerySort) => void;
+  onSelect: (id: number) => void;
   onAnalyze: () => void;
 };
 
 const pct = (value: number) => `${Math.round(value * 100)}%`;
 
-export default function QueryList({ records, onAnalyze }: Props) {
-  const [sort, setSort] = useState<QuerySort>('newest');
+export default function QueryList({ records, sort, onSortChange, onSelect, onAnalyze }: Props) {
   const sortedRecords = sortQueryRecords(records, sort);
 
   return <>
@@ -29,14 +30,14 @@ export default function QueryList({ records, onAnalyze }: Props) {
       <div className="section-heading list-heading">
         <div><span className="step">{String(records.length).padStart(2, '0')}</span><h2 id="query-list-heading">질의 목록</h2></div>
         <label className="sort-label">정렬 기준
-          <select aria-label="질의 정렬 기준" value={sort} onChange={event => setSort(event.target.value as QuerySort)}>
+          <select aria-label="질의 정렬 기준" value={sort} onChange={event => onSortChange(event.target.value as QuerySort)}>
             <option value="newest">최신 분석순</option>
             <option value="priority">우선순위순</option>
           </select>
         </label>
       </div>
 
-      <p className="session-notice">목록은 현재 브라우저 메모리에만 유지되며 새로고침하면 초기화됩니다.</p>
+      <p className="session-notice">목록은 현재 브라우저 메모리에만 유지되며 새로고침하면 초기화됩니다. 신뢰도는 Jev 긴급도 판단의 확률 분포 집중도이며 정답률이나 운영 규칙 관련성은 아닙니다.</p>
 
       {sortedRecords.length === 0 ? <div className="empty-list">
         <span aria-hidden="true">◎</span>
@@ -46,7 +47,7 @@ export default function QueryList({ records, onAnalyze }: Props) {
       </div> : <ol className="query-items">
         {sortedRecords.map(record => {
           const { post, analysis } = record;
-          const level = analysis.priority.level;
+          const level = analysis.handlingPriority.level;
           return <li className="query-item" key={record.id}>
             <div className="query-time">
               <time dateTime={analysis.analyzedAt}>{new Date(analysis.analyzedAt).toLocaleString('ko-KR')}</time>
@@ -54,13 +55,15 @@ export default function QueryList({ records, onAnalyze }: Props) {
             </div>
             <div className="query-copy">
               <div className="query-title-line">
-                <h3>{post.title}</h3>
+                <h3><button type="button" className="query-title-button" onClick={() => onSelect(record.id)}>{post.title}</button></h3>
                 <span className={`priority-badge ${level}`}>Level {level.slice(-1)} · {labels[level]}</span>
               </div>
               <p className="query-target">대상 · {post.targetInfo}</p>
+              <p className="query-origin">{analysis.provider === 'mock' ? 'Mock' : 'Jev'} 긴급도 Level {analysis.priority.level.slice(-1)}{analysis.handlingPriority.source === 'operating_rule' && ' · 운영 규칙 적용'}</p>
+              {analysis.handlingPriority.ruleTopic && <p className="query-rule">주제 관련성 {pct(analysis.handlingPriority.matchProbability ?? 0)} · {analysis.handlingPriority.source === 'operating_rule' ? analysis.priority.level === 'level_1' ? '원래 Level 1 유지' : '처리 Level 1 상향' : '기준 80% 미달'}</p>}
               <p className="query-excerpt">{post.content}</p>
             </div>
-            <div className="query-confidence"><span>판단 신뢰도</span><strong>{pct(analysis.priority.confidence)}</strong></div>
+            <div className="query-confidence"><span>{analysis.provider === 'mock' ? 'Mock' : 'Jev'} 긴급도 신뢰도</span><strong>{pct(analysis.priority.confidence)}</strong></div>
           </li>;
         })}
       </ol>}

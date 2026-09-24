@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from backend.app.config import Settings
 from backend.app.main import create_app
 from backend.app.models import PostInput
-from backend.app.providers import JevPriorityAnalyzer, MockPriorityAnalyzer
+from backend.app.providers import AnalysisError, JevPriorityAnalyzer, JevRuleMatcher, MockPriorityAnalyzer
 
 SAMPLES = json.loads(Path('samples/posts.json').read_text())
 POST = SAMPLES[0]['post']
@@ -203,3 +203,81 @@ def test_configuration(monkeypatch):
     assert settings.provider=='jev' and settings.low_confidence_threshold==.75
     assert 'synthetic-secret' not in repr(settings)
     with pytest.raises(ValueError): Settings(provider='invalid')
+
+
+@pytest.mark.parametrize('probability,expected', [(.799, 'level_4'), (.8, 'level_1'), (.96, 'level_1')])
+def test_rule_threshold_preserves_original(probability, expected):
+    class FixedMatcher:
+        async def match(self, post, topic):
+            assert topic == '종사자 변경보고 기능 관련 질의'
+            return probability
+
+    sample = SAMPLES[-1]
+    client = TestClient(create_app(Settings(), rule_matcher=FixedMatcher()))
+    original = client.post('/api/analyze-priority', json=sample['post']).json()
+    matched = client.post('/api/analyze-priority', json={**sample['post'], 'operatingRuleTopic': '종사자 변경보고 기능 관련 질의'}).json()
+    assert original['handlingPriority'] == {'level': sample['level'], 'source': 'base', 'ruleTopic': None, 'matchProbability': None}
+    assert matched['handlingPriority'] == {'level': expected, 'source': 'operating_rule' if probability >= .8 else 'base', 'ruleTopic': '종사자 변경보고 기능 관련 질의', 'matchProbability': probability}
+    assert matched['priority'] == original['priority']
+    assert matched['signals'] == original['signals']
+
+
+def test_original_level_one_is_never_demoted():
+    class FixedMatcher:
+        async def match(self, post, topic): return .99
+    response = TestClient(create_app(Settings(), rule_matcher=FixedMatcher())).post('/api/analyze-priority', json={**POST, 'operatingRuleTopic': '급여 마감'}).json()
+    assert response['priority']['level'] == response['handlingPriority']['level'] == 'level_1'
+
+
+def test_mock_rule_fixture_and_unmatched():
+    client = TestClient(create_app(Settings()))
+    topic = '종사자 변경보고 기능 관련 질의'
+    matched = client.post('/api/analyze-priority', json={**SAMPLES[-1]['post'], 'operatingRuleTopic': topic}).json()
+    unmatched = client.post('/api/analyze-priority', json={**SAMPLES[3]['post'], 'operatingRuleTopic': topic}).json()
+    assert matched['handlingPriority']['level'] == 'level_1'
+    assert matched['handlingPriority']['matchProbability'] == .96
+    assert matched['priority']['level'] == 'level_4'
+    assert unmatched['handlingPriority']['source'] == 'base'
+    assert unmatched['handlingPriority']['matchProbability'] == .04
+
+
+def test_rule_failure_never_returns_partial_success():
+    class FailingMatcher:
+        async def match(self, post, topic):
+            raise AnalysisError('JEV_TIMEOUT', 'Jev 요청 시간이 초과되었습니다.', 504)
+    response = TestClient(create_app(Settings(), rule_matcher=FailingMatcher())).post('/api/analyze-priority', json={**POST, 'operatingRuleTopic': '합성 주제'})
+    assert response.status_code == 504
+    assert 'priority' not in response.json()
+
+
+@pytest.mark.parametrize('topic', ['', ' ', '가' * 201, 42])
+def test_rule_topic_validation(topic):
+    response = TestClient(create_app(Settings())).post('/api/analyze-priority', json={**POST, 'operatingRuleTopic': topic})
+    assert response.status_code == 422
+    assert 'operatingRuleTopic' in response.json()['error']['fields']
+    assert POST['content'] not in response.text
+
+
+def test_rule_uses_separate_noul_sdk_call_and_no_extra_call_without_rule():
+    seen = []
+    def handler(request):
+        body = json.loads(request.content)
+        seen.append(body)
+        if 'topicRelated' in body['questions']:
+            return httpx2.Response(200, json={'model': 'jev-test', 'usage': {'input_tokens': 10, 'output_tokens': 3}, 'answers': {'topicRelated': {'type': 'noul', 'noul': .8}}})
+        return httpx2.Response(200, json=wire_response())
+    transport = httpx2.MockTransport(handler)
+    app = create_app(Settings(provider='jev'), JevPriorityAnalyzer('synthetic-test-key', transport=transport), JevRuleMatcher('synthetic-test-key', transport=transport))
+    client = TestClient(app)
+    plain = client.post('/api/analyze-priority', json=POST)
+    assert plain.status_code == 200
+    assert len(seen) == 1
+    with_rule = client.post('/api/analyze-priority', json={**POST, 'operatingRuleTopic': '급여 마감'})
+    assert with_rule.status_code == 200, with_rule.text
+    assert len(seen) == 3
+    urgency = next(body for body in seen[1:] if 'priority' in body['questions'])
+    relevance = next(body for body in seen[1:] if 'topicRelated' in body['questions'])
+    assert urgency['state'] == seen[0]['state']
+    assert relevance['questions']['topicRelated']['type'] == 'noul'
+    assert relevance['state']['post'] == {'title': POST['title'], 'content': POST['content']}
+    assert relevance['state']['topic'] == '급여 마감'

@@ -7,6 +7,7 @@ import { sortQueryRecords, type QueryRecord } from './history';
 import samples from '../../samples/posts.json';
 const result: Analysis = {
   priority: {level:'level_1',label:'긴급',confidence:.91,probabilities:{level_1:.87,level_2:.1,level_3:.02,level_4:.01}},
+  handlingPriority: {level:'level_1',source:'base',ruleTopic:null,matchProbability:null},
   signals:{payrollDisrupted:.94,requiredFunctionUnavailable:.86,workBlocked:.92,impactScope:'team',impactScopeConfidence:.82},
   analyzedAt:'2026-09-21T12:00:00Z',provider:'mock',
 };
@@ -117,7 +118,7 @@ it('adds only successful analyses and lists them newest first', async () => {
   let analysisCall = 0;
   const responses = [
     {...result, analyzedAt:'2026-09-21T12:00:00Z'},
-    {...result, priority:{...result.priority, level:'level_4' as const, label:'낮음'}, analyzedAt:'2026-09-21T13:00:00Z'},
+    {...result, priority:{...result.priority, level:'level_4' as const, label:'낮음'}, handlingPriority:{...result.handlingPriority,level:'level_4' as const}, analyzedAt:'2026-09-21T13:00:00Z'},
   ];
   const fetch = vi.spyOn(globalThis,'fetch').mockImplementation(async input => input==='/api/config'
     ? ok({provider:'mock',lowConfidenceThreshold:.6})
@@ -166,7 +167,7 @@ it('uses record id as a stable newest-first tie breaker', () => {
 
 it('sorts priority from Level 1 to 4, then newest and record id without changing the source', () => {
   const record = (id: number, level: Analysis['priority']['level'], analyzedAt: string): QueryRecord => ({
-    id, post: samples[0].post, analysis: {...result, priority: {...result.priority, level}, analyzedAt},
+    id, post: samples[0].post, analysis: {...result, priority: {...result.priority, level}, handlingPriority:{...result.handlingPriority,level}, analyzedAt},
   });
   const records = [
     record(1,'level_4','2026-09-21T15:00:00Z'),
@@ -178,4 +179,89 @@ it('sorts priority from Level 1 to 4, then newest and record id without changing
   ];
   expect(sortQueryRecords(records,'priority').map(item => item.id)).toEqual([3,6,4,2,5,1]);
   expect(records.map(item => item.id)).toEqual([1,2,3,4,5,6]);
+});
+
+it('sorts a rule-promoted handling Level before a higher raw urgency', () => {
+  const normal: QueryRecord = {id:1,post:samples[1].post,analysis:{...result,priority:{...result.priority,level:'level_2'},handlingPriority:{...result.handlingPriority,level:'level_2'}}};
+  const promoted: QueryRecord = {id:2,post:samples.at(-1)!.post,analysis:{...result,priority:{...result.priority,level:'level_4'},handlingPriority:{level:'level_1',source:'operating_rule',ruleTopic:'종사자 변경보고 기능 관련 질의',matchProbability:.96}}};
+  expect(sortQueryRecords([normal,promoted],'priority').map(item => item.id)).toEqual([2,1]);
+  expect(promoted.analysis.priority.level).toBe('level_4');
+});
+
+it('sets, edits and clears one session rule for future submissions only', async () => {
+  const captured: unknown[] = [];
+  const fetch = vi.spyOn(globalThis,'fetch').mockImplementation(async (input, init) => {
+    if (input === '/api/config') return ok({provider:'mock',lowConfidenceThreshold:.6});
+    const body = JSON.parse(String(init?.body));
+    captured.push(body);
+    const promoted = body.operatingRuleTopic === '종사자 변경보고 기능 관련 질의';
+    return ok({...result, priority:{...result.priority,level:'level_4',label:'낮음'}, handlingPriority:{level: promoted ? 'level_1' : 'level_4',source:promoted ? 'operating_rule' : 'base',ruleTopic:body.operatingRuleTopic ?? null,matchProbability:body.operatingRuleTopic ? (promoted ? .96 : .04) : null}});
+  });
+  render(<App/>); await screen.findByText('● Mock 모드');
+  await userEvent.selectOptions(screen.getByRole('combobox',{name:'시연 예제'}),String(samples.length-1));
+  await userEvent.click(screen.getByRole('button',{name:/Jev로 우선순위 분석/}));
+  await screen.findByText('Mock 분석 결과');
+  expect(captured[0]).not.toHaveProperty('operatingRuleTopic');
+  await userEvent.click(screen.getByRole('button',{name:/운영 규칙/}));
+  await userEvent.click(screen.getByRole('button',{name:'시연 주제 채우기'}));
+  await userEvent.click(screen.getByRole('button',{name:'규칙 저장'}));
+  await userEvent.click(screen.getByRole('button',{name:'새 분석'}));
+  await userEvent.click(screen.getByRole('button',{name:/Jev로 우선순위 분석/}));
+  await screen.findByText(/처리 우선순위를 Level 1로 상향했습니다/);
+  expect(screen.getByText(/Mock 업무 긴급도 · Level 4/)).toBeInTheDocument();
+  expect(captured[1]).toHaveProperty('operatingRuleTopic','종사자 변경보고 기능 관련 질의');
+  await userEvent.click(screen.getByRole('button',{name:/운영 규칙/}));
+  fireEvent.change(screen.getByLabelText(/주제 설명/),{target:{value:'다른 기능'}});
+  await userEvent.click(screen.getByRole('button',{name:'규칙 수정'}));
+  await userEvent.click(screen.getByRole('button',{name:/질의 목록 2/}));
+  expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('운영 규칙 적용');
+  await userEvent.click(screen.getByRole('button',{name:'새 분석'}));
+  await userEvent.click(screen.getByRole('button',{name:/Jev로 우선순위 분석/}));
+  await screen.findByText(/80% 미만으로 원래 긴급도를 유지했습니다/);
+  expect(captured[2]).toHaveProperty('operatingRuleTopic','다른 기능');
+  await userEvent.click(screen.getByRole('button',{name:/운영 규칙/}));
+  await userEvent.click(screen.getByRole('button',{name:'규칙 해제'}));
+  await userEvent.click(screen.getByRole('button',{name:'새 분석'}));
+  await userEvent.click(screen.getByRole('button',{name:/Jev로 우선순위 분석/}));
+  await screen.findByText('Mock 분석 결과');
+  expect(captured[3]).not.toHaveProperty('operatingRuleTopic');
+  expect(fetch).toHaveBeenCalledTimes(5);
+});
+
+it('does not save a result when the rule relevance call fails', async () => {
+  mockFetch(async () => new Response(JSON.stringify({error:{code:'JEV_TIMEOUT',message:'Jev 요청 시간이 초과되었습니다.'}}),{status:504}));
+  render(<App/>); await screen.findByText('● Mock 모드');
+  await userEvent.click(screen.getByRole('button',{name:'운영 규칙'}));
+  await userEvent.click(screen.getByRole('button',{name:'시연 주제 채우기'}));
+  await userEvent.click(screen.getByRole('button',{name:'규칙 저장'}));
+  await userEvent.click(screen.getByRole('button',{name:'새 분석'}));
+  await userEvent.selectOptions(screen.getByRole('combobox',{name:'시연 예제'}),String(samples.length-1));
+  await userEvent.click(screen.getByRole('button',{name:/Jev로 우선순위 분석/}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Jev 요청 시간이 초과되었습니다.');
+  expect(screen.queryByRole('meter')).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button',{name:/질의 목록 0/}));
+  expect(screen.getByText('아직 분석한 질의가 없습니다.')).toBeInTheDocument();
+});
+
+it('opens read-only detail with the original urgency and rule reason without another API call', async () => {
+  const analysis: Analysis = {...result, priority:{...result.priority,level:'level_4',label:'낮음'},handlingPriority:{level:'level_1',source:'operating_rule',ruleTopic:'인력현황 기능',matchProbability:.97}};
+  const fetch = mockFetch(async () => ok(analysis));
+  render(<App/>); await screen.findByText('● Mock 모드');
+  await userEvent.selectOptions(screen.getByRole('combobox',{name:'시연 예제'}),String(samples.length-1));
+  await userEvent.click(screen.getByRole('button',{name:/Jev로 우선순위 분석/}));
+  await screen.findByText('Mock 분석 결과');
+  await userEvent.click(screen.getByRole('button',{name:/질의 목록 1/}));
+  await userEvent.selectOptions(screen.getByRole('combobox',{name:'질의 정렬 기준'}),'priority');
+  const callsBeforeDetail = fetch.mock.calls.length;
+  await userEvent.click(screen.getByRole('button',{name:samples.at(-1)!.post.title}));
+  expect(screen.getByRole('heading',{name:'질의 상세'})).toBeInTheDocument();
+  expect(screen.getByText(samples.at(-1)!.post.content)).toBeInTheDocument();
+  expect(screen.getByText(/Mock 업무 긴급도 · Level 4/)).toBeInTheDocument();
+  expect(screen.getByText(/주제 관련성 97%/)).toBeInTheDocument();
+  expect(screen.getAllByRole('meter')).toHaveLength(4);
+  expect(fetch).toHaveBeenCalledTimes(callsBeforeDetail);
+  await userEvent.click(screen.getByRole('button',{name:/목록으로 돌아가기/}));
+  expect(screen.getByRole('combobox',{name:'질의 정렬 기준'})).toHaveValue('priority');
+  await userEvent.click(screen.getByRole('button',{name:'새 분석'}));
+  expect(screen.getByLabelText(/제목/)).toHaveValue(samples.at(-1)!.post.title);
 });

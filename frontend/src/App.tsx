@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import samples from '../../samples/posts.json';
-import { analyze, ApiError, charCount, configSchema, fields, labels, levels, scopeLabels, validate, type Analysis, type Config, type FieldErrors, type PostInput } from './api';
+import { analyze, ApiError, charCount, configSchema, fields, labels, levels, validate, type Analysis, type Config, type FieldErrors, type PostInput } from './api';
+import AnalysisResult from './AnalysisResult';
+import QueryDetail from './QueryDetail';
 import QueryList from './QueryList';
-import type { QueryRecord } from './history';
+import RuleSettings from './RuleSettings';
+import type { QueryRecord, QuerySort } from './history';
 const emptyPost = { targetInfo: '', title: '', content: '' };
-const pct = (value: number) => `${Math.round(value * 100)}%`;
-type View = 'analyze' | 'list';
+type View = 'analyze' | 'list' | 'detail' | 'rule';
 
 export default function App() {
   const [post, setPost] = useState<PostInput>(emptyPost);
@@ -18,7 +20,10 @@ export default function App() {
   const [configAttempt, setConfigAttempt] = useState(0);
   const [sampleIndex, setSampleIndex] = useState('');
   const [view, setView] = useState<View>('analyze');
+  const [ruleTopic, setRuleTopic] = useState<string | null>(null);
   const [queryRecords, setQueryRecords] = useState<QueryRecord[]>([]);
+  const [querySort, setQuerySort] = useState<QuerySort>('newest');
+  const [selectedRecordId, setSelectedRecordId] = useState<number | null>(null);
   const inFlight = useRef(false);
   const recordId = useRef(0);
   const controller = useRef<AbortController | null>(null);
@@ -45,7 +50,7 @@ export default function App() {
     const abort = new AbortController(); controller.current = abort;
     const timeout = window.setTimeout(() => abort.abort(), 30000);
     try {
-      const analysis = await analyze(post, abort.signal);
+      const analysis = await analyze(post, abort.signal, ruleTopic);
       setResult(analysis);
       setQueryRecords(records => [...records, { id: ++recordId.current, post: { ...post }, analysis }]);
     }
@@ -55,15 +60,17 @@ export default function App() {
     } finally { window.clearTimeout(timeout); inFlight.current = false; setLoading(false); }
   }
   function reset() { setPost(emptyPost); setErrors({}); setError(''); setResult(null); setSampleIndex(''); }
+  const selectedRecord = queryRecords.find(record => record.id === selectedRecordId);
   return <>
-    <header className="topbar"><button type="button" className="brand" aria-label="Jev 홈" onClick={() => setView('analyze')}><span className="brand-icon">j.</span> Jev <span className="brand-divider">/</span><span className="brand-sub">Priority Lab</span></button><nav className="app-nav" aria-label="주요 화면"><button type="button" className={view === 'analyze' ? 'active' : ''} aria-current={view === 'analyze' ? 'page' : undefined} onClick={() => setView('analyze')}>새 분석</button><button type="button" className={view === 'list' ? 'active' : ''} aria-current={view === 'list' ? 'page' : undefined} onClick={() => setView('list')}>질의 목록 <span>{queryRecords.length}</span></button></nav><span className="mvp">MVP · 우선순위 분석</span></header>
+    <header className="topbar"><button type="button" className="brand" aria-label="Jev 홈" onClick={() => setView('analyze')}><span className="brand-icon">j.</span> Jev <span className="brand-divider">/</span><span className="brand-sub">Priority Lab</span></button><nav className="app-nav" aria-label="주요 화면"><button type="button" className={view === 'analyze' ? 'active' : ''} aria-current={view === 'analyze' ? 'page' : undefined} onClick={() => setView('analyze')}>새 분석</button><button type="button" className={view === 'list' || view === 'detail' ? 'active' : ''} aria-current={view === 'list' || view === 'detail' ? 'page' : undefined} onClick={() => setView('list')}>질의 목록 <span>{queryRecords.length}</span></button><button type="button" className={view === 'rule' ? 'active' : ''} aria-current={view === 'rule' ? 'page' : undefined} onClick={() => setView('rule')}>운영 규칙{ruleTopic ? ' ●' : ''}</button></nav><span className="mvp">MVP · 우선순위 분석</span></header>
     <main>
-      {view === 'list' ? <QueryList records={queryRecords} onAnalyze={() => setView('analyze')} /> : <>
+      {view === 'list' ? <QueryList records={queryRecords} sort={querySort} onSortChange={setQuerySort} onSelect={id => { setSelectedRecordId(id); setView('detail'); }} onAnalyze={() => setView('analyze')} /> : view === 'detail' && selectedRecord ? <QueryDetail record={selectedRecord} lowConfidenceThreshold={config?.lowConfidenceThreshold ?? 0.6} onBack={() => setView('list')} /> : view === 'rule' ? <RuleSettings topic={ruleTopic} isMock={config?.provider === 'mock'} onSave={setRuleTopic} onClear={() => setRuleTopic(null)} /> : <>
       <div className="intro"><p className="eyebrow">POST PRIORITY ANALYZER</p><h1>어떤 업무를 먼저<br className="mobile-break"/> 해결해야 할까요?</h1><p>게시글의 문맥을 읽고, 업무 긴급도를 네 단계의 확률로 확인하세요.</p></div>
       <section className="card" aria-labelledby="form-heading">
         <div className="section-heading"><div><span className="step">01</span><h2 id="form-heading">게시글 작성</h2></div><span className={`mode ${config?.provider === 'jev' ? 'live' : ''}`}>{config ? config.provider === 'mock' ? '● Mock 모드' : '● Jev 모드' : '설정 확인 중'}</span></div>
         {configError && <div role="alert" className="error-banner">서버 설정을 불러오지 못했습니다. 백엔드 실행 상태를 확인해 주세요. <button type="button" className="text-button" onClick={() => setConfigAttempt(n => n + 1)}>설정 다시 불러오기</button></div>}
         {config?.provider === 'mock' && <div className="demo-panel"><div><strong>API 키 없이 먼저 체험해 보세요.</strong><p>합성 예제는 고정 결과를 보여 줍니다. 다른 입력은 낮은 신뢰도의 시연 결과이며, 실제 AI 판단이 아닙니다.</p></div><label className="sample-label">시연 예제<select aria-label="시연 예제" value={sampleIndex} disabled={loading} onChange={e => { const value = e.target.value; setSampleIndex(value); setPost(value === '' ? emptyPost : samples[Number(value)].post); setResult(null); setError(''); setErrors({}); }}><option value="">예제 선택하기</option>{samples.map((s, i) => <option key={s.name} value={i}>{s.name}</option>)}</select></label></div>}
+        {ruleTopic && <p className="active-rule">운영 규칙 적용 중 · {ruleTopic} <button type="button" className="text-button" onClick={() => setView('rule')}>수정</button></p>}
         <form onSubmit={submit} noValidate aria-busy={loading}>
           {fields.map(field => <div className="field" key={field.key}>
             <div className="label-line"><label htmlFor={field.key}>{field.label} <span className="required">필수</span></label><span className={charCount(post[field.key]) > field.max ? 'over-limit' : ''}>{charCount(post[field.key]).toLocaleString()} / {field.max.toLocaleString()}</span></div>
@@ -75,15 +82,7 @@ export default function App() {
           {loading && <p className="loading" role="status"><span className="spinner"/>Jev가 게시글을 분석하고 있습니다...</p>}
         </form>
       </section>
-      {result && config && <section ref={resultRef} tabIndex={-1} className="card results" aria-labelledby="result-heading">
-        <div className="section-heading"><div><span className="step">02</span><h2 id="result-heading">분석 결과</h2></div><span className="mode">{result.provider === 'mock' ? 'Mock 분석 결과' : 'Jev 분석 결과'}</span></div>
-        <div className="result-overview"><div><p className="eyebrow">최종 우선순위</p><h3 className={result.priority.level}>Level {result.priority.level.slice(-1)} · {labels[result.priority.level]}</h3></div><div className="confidence"><span>{result.provider === 'mock' ? 'Mock 판단 신뢰도' : 'Jev 판단 신뢰도'}</span><strong>{pct(result.priority.confidence)}</strong></div></div>
-        {result.priority.confidence < config.lowConfidenceThreshold && <p role="status" className="warning">판단 신뢰도가 낮습니다. 사람이 내용을 추가로 확인하는 것이 좋습니다.</p>}
-        <div className="result-grid"><div><h4>Level별 확률</h4><p className="hint">숫자가 낮을수록 긴급합니다.</p><div className="bars">{levels.map(level => <div className={`bar-row ${level}`} key={level}><div><span>Level {level.slice(-1)} · {labels[level]} {result.priority.level === level && <small>선택</small>}</span><strong>{pct(result.priority.probabilities[level])}</strong></div><div role="meter" aria-label={`Level ${level.slice(-1)} 확률`} aria-valuenow={result.priority.probabilities[level] * 100} aria-valuemin={0} aria-valuemax={100} className="bar-track"><span style={{ width: `${result.priority.probabilities[level] * 100}%` }}/></div></div>)}</div></div>
-        <div className="signals"><h4>세부 분석</h4><p className="hint">게시글에서 감지한 업무 문맥입니다.</p><dl><div><dt>급여 업무 중단</dt><dd>{pct(result.signals.payrollDisrupted)}</dd></div><div><dt>필수 기능 장애</dt><dd>{pct(result.signals.requiredFunctionUnavailable)}</dd></div><div><dt>업무 진행 차단</dt><dd>{pct(result.signals.workBlocked)}</dd></div><div><dt>영향 범위</dt><dd>{scopeLabels[result.signals.impactScope]}</dd></div><div><dt>영향 범위 판단 신뢰도</dt><dd>{pct(result.signals.impactScopeConfidence)}</dd></div></dl></div></div>
-        <p className="result-note">신뢰도는 확률 분포의 집중도를 나타내며, 정답률을 의미하지 않습니다. 세부 분석값으로 최종 Level을 다시 계산하지 않습니다.</p>
-        <p className="timestamp">분석 시각 · {new Date(result.analyzedAt).toLocaleString('ko-KR')}</p>
-      </section>}
+      {result && config && <AnalysisResult analysis={result} lowConfidenceThreshold={config.lowConfidenceThreshold} focusRef={resultRef} />}
       {!result && <div className="level-guide" aria-label="우선순위 기준">{levels.map((level, i) => <div key={level}><span className={`level-dot ${level}`}/><strong>Level {i + 1} · {labels[level]}</strong><p>{['즉시 대응이 필요한 업무 중단', '빠른 대응이 필요한 주요 장애', '일반 확인 또는 우회 가능한 문제', '문의 · 개선 요청 · 단순 불편'][i]}</p></div>)}</div>}
       </>}
       <footer>Jev Priority Lab <span>문맥을 판단하고, 확률로 확인합니다.</span></footer>

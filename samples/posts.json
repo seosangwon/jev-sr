@@ -10,5 +10,6 @@
   {"name":"전체 대상 단순 공지 요청","post":{"targetInfo":"전체 임직원","title":"사용 안내 공지 요청","content":"업무는 정상적으로 진행하고 있습니다. 새 사용 안내를 공지해 주세요."},"level":"level_4","scope":"unknown","signals":[0.01,0.01,0.01]},
   {"name":"모호한 내용 / 낮은 신뢰도","post":{"targetInfo":"담당 팀","title":"확인 요청","content":"이상합니다."},"level":"level_3","scope":"unknown","signals":[0.4,0.5,0.5],"confidence":0.35},
   {"name":"한글·영문·특수문자 혼합","post":{"targetInfo":"QA 테스트 팀","title":"Report v2 검색 조건 (#42) 초기화","content":"Filter가 초기화됩니다! 2026-09 데이터는 다시 입력하면 조회 가능하며 업무는 계속할 수 있습니다."},"level":"level_3","scope":"team","signals":[0.01,0.15,0.1]},
-  {"name":"여러 팀 주요 기능 장애","post":{"targetInfo":"재무팀 및 구매팀","title":"주요 결재 기능 처리 지연","content":"여러 팀의 다수 사용자가 결재 승인을 완료하지 못해 주요 업무 진행이 크게 제한되고 있습니다."},"level":"level_2","scope":"many_users","signals":[0.02,0.88,0.86]}
+  {"name":"여러 팀 주요 기능 장애","post":{"targetInfo":"재무팀 및 구매팀","title":"주요 결재 기능 처리 지연","content":"여러 팀의 다수 사용자가 결재 승인을 완료하지 못해 주요 업무 진행이 크게 제한되고 있습니다."},"level":"level_2","scope":"many_users","signals":[0.02,0.88,0.86]},
+  {"name":"종사자 변경보고 사용법 문의","post":{"targetInfo":"시설 운영 담당자","title":"종사자 변경보고 작성 방법 문의","content":"종사자 변경보고 화면에서 새 양식을 어디서 작성하는지 알려 주세요. 기능 오류는 없습니다."},"level":"level_4","scope":"individual","signals":[0.01,0.01,0.01]}
 ]

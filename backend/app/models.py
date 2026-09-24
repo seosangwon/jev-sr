@@ -23,6 +23,19 @@ class PostInput(BaseModel):
         return value.strip()
 
 
+class AnalysisRequest(PostInput):
+    operatingRuleTopic: str | None = Field(default=None, min_length=1, max_length=200)
+
+    @field_validator("operatingRuleTopic")
+    @classmethod
+    def nonblank_topic(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not value.strip():
+            raise ValueError("공백만 입력할 수 없습니다.")
+        return value.strip()
+
+
 class Priority(BaseModel):
     level: Level
     label: str
@@ -43,3 +56,14 @@ class PriorityAnalysis(BaseModel):
     signals: Signals
     analyzedAt: datetime
     provider: Literal["mock", "jev"]
+
+
+class HandlingPriority(BaseModel):
+    level: Level
+    source: Literal["base", "operating_rule"]
+    ruleTopic: str | None = None
+    matchProbability: Probability | None = None
+
+
+class AnalysisResponse(PriorityAnalysis):
+    handlingPriority: HandlingPriority

@@ -17,6 +17,7 @@ export function validate(post: PostInput): FieldErrors {
 const probability = z.number().finite().min(0).max(1);
 const schema = z.object({
   priority: z.object({ level: z.enum(levels), label: z.string(), confidence: probability, probabilities: z.object({ level_1: probability, level_2: probability, level_3: probability, level_4: probability }) }),
+  handlingPriority: z.object({ level: z.enum(levels), source: z.enum(['base', 'operating_rule']), ruleTopic: z.string().nullable(), matchProbability: probability.nullable() }),
   signals: z.object({ payrollDisrupted: probability, requiredFunctionUnavailable: probability, workBlocked: probability, impactScope: z.enum(['individual', 'team', 'many_users', 'organization_wide', 'unknown']), impactScopeConfidence: probability }),
   analyzedAt: z.string().datetime({ offset: true }), provider: z.enum(['mock', 'jev']),
 }).refine(r => Math.abs(Object.values(r.priority.probabilities).reduce((a, b) => a + b, 0) - 1) < 0.01);
@@ -24,8 +25,8 @@ export type Analysis = z.infer<typeof schema>;
 export const configSchema = z.object({ provider: z.enum(['mock', 'jev']), lowConfidenceThreshold: probability });
 export type Config = z.infer<typeof configSchema>;
 export class ApiError extends Error { constructor(message: string, public fields: FieldErrors = {}) { super(message); } }
-export async function analyze(post: PostInput, signal: AbortSignal): Promise<Analysis> {
-  const response = await fetch('/api/analyze-priority', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(post), signal });
+export async function analyze(post: PostInput, signal: AbortSignal, operatingRuleTopic: string | null = null): Promise<Analysis> {
+  const response = await fetch('/api/analyze-priority', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(operatingRuleTopic ? {...post, operatingRuleTopic} : post), signal });
   let body: unknown;
   try { body = await response.json(); } catch { throw new ApiError('서버 응답을 읽을 수 없습니다. 다시 시도해 주세요.'); }
   if (!response.ok) {

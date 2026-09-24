@@ -29,10 +29,13 @@ npm run dev --prefix frontend
 2. `Jev로 우선순위 분석`을 누르면 Level 1과 네 확률 막대가 표시됩니다.
 3. **급여 조회 방법 문의**는 Level 4로 표시됩니다.
 4. **모호한 내용 / 낮은 신뢰도**는 Level 3과 추가 확인 안내를 표시합니다.
-5. 여러 질의를 분석한 뒤 상단 `질의 목록`을 누르면 최근 분석한 순서로 결과가 표시됩니다. `정렬 기준`에서 `우선순위순`을 선택하면 Level 1부터 볼 수 있습니다.
-6. 초기화 후 새 입력을 작성할 수 있습니다. 입력·결과·목록은 브라우저 메모리에만 유지되며 새로고침하면 사라집니다.
+5. 여러 질의를 분석한 뒤 상단 `질의 목록`을 누르면 최근 분석한 순서로 결과가 표시됩니다. 제목을 누르면 당시 입력과 분석 전체를 추가 API 호출 없이 다시 볼 수 있습니다. `목록으로 돌아가기`를 눌러도 정렬 기준과 작성 중인 입력이 유지됩니다. `우선순위순`은 처리 우선순위 Level 1부터 표시합니다.
+6. `운영 규칙`에서 `시연 주제 채우기` → `규칙 저장`을 누르고, `새 분석`에서 **종사자 변경보고 사용법 문의** 예제를 분석하세요. 원래 Mock 긴급도는 Level 4, 관련성 고정 시연값은 96%, 처리 우선순위는 Level 1입니다.
+7. 초기화 후 새 입력을 작성할 수 있습니다. 입력·결과·목록·운영 규칙은 브라우저 메모리에만 유지되며 새로고침하면 사라집니다.
 
-[samples/posts.json](samples/posts.json)에 기본·경계 사례 12개를 제공합니다. 모두 합성 데이터입니다. Mock은 세 필드가 일치하는 예제의 결과를 재생합니다(앞뒤 공백은 무시). **예제를 수정하거나 다른 글을 입력하면 Level 3·낮은 신뢰도의 고정 시연 결과를 반환합니다.** 키워드 분류기나 실제 AI가 아니며 자유 입력에 대한 의미 분석 정확도를 검증하는 모드가 아닙니다. 시간 정보만 현재 시각이며 나머지 결과는 결정론적입니다.
+운영 규칙 입력은 자유 명령 프롬프트가 아니라 **비교할 주제 설명**입니다. 예를 들어 “장기요양기관 대장 인력현황 기능 관련 질의”처럼 기능·업무명 위주로 적습니다. Jev가 별도 질문에서 매긴 관련성 확률이 80% 미만이면 처리 Level은 원래 긴급도와 같습니다. 원래 긴급도가 이미 Level 1인 경우에도 Level은 그대로입니다. 목록의 `Jev 긴급도 신뢰도`는 관련성 확률이나 정답률이 아니라 Jev가 선택한 긴급도 확률 분포의 집중도입니다.
+
+[samples/posts.json](samples/posts.json)에 기본·경계 사례 13개를 제공합니다. 모두 합성 데이터입니다. Mock은 세 필드가 일치하는 예제의 결과를 재생합니다(앞뒤 공백은 무시). **예제를 수정하거나 다른 글을 입력하면 Level 3·낮은 신뢰도의 고정 시연 결과를 반환합니다.** 키워드 분류기나 실제 AI가 아니며 자유 입력에 대한 의미 분석 정확도를 검증하는 모드가 아닙니다. 시간 정보만 현재 시각이며 나머지 결과는 결정론적입니다. 운영 규칙 관련성은 [samples/rule_matches.json](samples/rule_matches.json)의 주제·질의 조합에만 고정값을 사용하고 다른 조합은 불확실한 50%를 표시합니다.
 
 ## Jev 모드와 설정
 
@@ -60,14 +63,16 @@ cp .env.example .env
 
 ```text
 React + TypeScript + Vite
-  ├─ 성공한 분석 → 세션 질의 목록 → 최신 분석순(기본) 또는 우선순위순
+  ├─ 운영 규칙 주제 하나(React 메모리) → 새 분석에만 적용
+  ├─ 성공한 분석 → 세션 질의 목록 → 최신 분석순(기본) 또는 처리 우선순위순
   ├─ GET /api/config             → 공개 Provider/신뢰도 기준
   └─ POST /api/analyze-priority  → FastAPI 입력 검증
                                    └─ PriorityAnalyzer 인터페이스
                                        ├─ MockPriorityAnalyzer → 합성 fixture
                                        └─ JevPriorityAnalyzer  → 공식 typesafe-sdk
                                                                   → Jev
-                                   ← 내부 PriorityAnalysis 응답
+                                   └─ 규칙이 있으면 별도 Jev Noul / Mock 고정 관련성
+                                   ← 원래 PriorityAnalysis + handlingPriority 응답
 ```
 
 | 파일 | 역할 |
@@ -79,9 +84,13 @@ React + TypeScript + Vite
 | `backend/app/config.py` | 서버 환경 설정 및 기준값 검증 |
 | `frontend/src/App.tsx` | 입력·로딩·재시도·초기화·결과 UI |
 | `frontend/src/QueryList.tsx` | 현재 세션의 질의 목록 화면 |
+| `frontend/src/QueryDetail.tsx` | 원래 입력과 당시 분석 결과를 읽기 전용으로 표시 |
+| `frontend/src/AnalysisResult.tsx` | 새 분석과 상세 보기에서 공유하는 결과 표시 |
+| `frontend/src/RuleSettings.tsx` | 세션 운영 규칙 주제 설정·수정·해제 |
 | `frontend/src/history.ts` | 목록 모델과 최신 분석순·우선순위순 정렬 |
 | `frontend/src/api.ts` | 클라이언트 검증, API 호출 및 런타임 응답 검증 |
 | `samples/posts.json` | Mock 및 시연·테스트에 공유하는 합성 사례 |
+| `samples/rule_matches.json` | Mock 규칙 관련성의 합성 고정 결과 |
 | `backend/tests/test_priority.py` | 입력·Provider·SDK HTTP 계약·변환·오류 테스트 |
 | `frontend/src/App.test.tsx` | UI 흐름·입력 경계·실패·재시도 테스트 |
 | `frontend/e2e/flow.spec.ts` | 실제 브라우저와 FastAPI를 연결하는 데모 테스트 |
@@ -100,7 +109,7 @@ Python 의존성은 `uv.lock`, 프론트엔드는 `frontend/package-lock.json`�
 - [신뢰도와 확률의 차이](https://docs.typesafe.ai/confidence)
 - [SDK 사용·재시도·로그](https://docs.typesafe.ai/sdk/python/usage)
 
-서버가 `AsyncTypeSafeClient.system_one(state=..., questions=...)`를 한 번 호출합니다. 공식 API 주소는 `https://api.typesafe.ai/v1/systemone`, 모델은 `jev-latest`입니다. 세 입력은 `[게시글 대상자]`, `[게시글 제목]`, `[게시글 내용]`으로 구분합니다.
+기본 분석에서 서버가 `AsyncTypeSafeClient.system_one(state=..., questions=...)`를 한 번 호출합니다. 운영 규칙이 켜진 새 질의에는 별도 `Noul` 질문 호출이 한 번 추가됩니다. 공식 API 주소는 `https://api.typesafe.ai/v1/systemone`, 모델은 `jev-latest`입니다. 긴급도 질문의 세 입력은 `[게시글 대상자]`, `[게시글 제목]`, `[게시글 내용]`으로 구분합니다. 별도 관련성 질문은 제목·내용과 주제 설명만 사용합니다. [TypeSafe Noul 공식 문서](https://docs.typesafe.ai/primitives/noul)에 따라 관련성의 예일 확률을 0.8 이상일 때만 처리 우선순위 상향에 사용하며, 이는 원래 긴급도의 확률이나 신뢰도가 아닙니다.
 
 | 질문 | 타입 | 응답 사용 |
 |---|---|---|
@@ -128,7 +137,7 @@ SDK의 `confidence`는 선택 확률과 별개인 분포 집중도의 지표이�
 
 각 필드는 필수 문자열이며, 대상자 500자·제목 200자·내용 5,000자까지 허용합니다. 앞뒤 공백 제거 전 길이를 검증하고 공백만 있는 값은 거절합니다. 프론트엔드와 Python 모두 Unicode 코드 포인트 수를 사용합니다(이모지도 양쪽에서 동일하게 계산). 프론트엔드는 초과 입력을 숨기거나 잘라내지 않고 구체적 오류를 표시합니다.
 
-성공 응답은 기획서의 `priority`, `signals`, `analyzedAt`, `provider` 구조를 따릅니다. 오류는 `{"error":{"code":"...","message":"...","fields":{...}}}` 형태이며, `fields`는 입력 오류에만 있습니다.
+성공 응답은 기획서의 `priority`, `signals`, `analyzedAt`, `provider`에 `handlingPriority`를 더한 구조를 따릅니다. 선택적 요청 필드 `operatingRuleTopic`은 1~200자의 주제 설명입니다. 응답의 `handlingPriority`에는 처리 Level, `base`/`operating_rule` 출처, 당시 주제와 관련성 확률이 들어갑니다. 규칙이 없으면 주제·확률은 null입니다. 오류는 `{"error":{"code":"...","message":"...","fields":{...}}}` 형태이며, `fields`는 입력 오류에만 있습니다. 관련성 호출이 실패하면 전체 분석이 실패하므로 부분 성공 결과는 반환하지 않습니다.
 
 | HTTP | 코드 | 사용자 조치 |
 |---|---|---|
@@ -160,7 +169,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-이 테스트는 테스트 프로세스의 Provider를 Mock으로 고정하고 키를 비웁니다. 외부 Jev 호출 없이 12개 사례의 분석·목록 누적·최신순/우선순위순 정렬과 모바일 화면을 확인합니다. SDK 계약 테스트 역시 공식 SDK와 HTTP 모의 transport를 연결하며 실제 API 비용이 발생하지 않습니다.
+이 테스트는 테스트 프로세스의 Provider를 Mock으로 고정하고 키를 비웁니다. 외부 Jev 호출 없이 13개 사례의 분석·목록 누적·최신순/우선순위순 정렬, 운영 규칙 상향과 모바일 화면을 확인합니다. SDK 계약 테스트 역시 공식 SDK와 HTTP 모의 transport를 연결하며 실제 API 비용이 발생하지 않습니다.
 
 ## 제약과 확장 지점
 
@@ -168,6 +177,7 @@ npm run test:e2e
 - `jev-latest`는 TypeSafe가 갱신하는 별칭이므로 모델 판단은 향후 바뀔 수 있습니다.
 - 개발용 MVP이며 공개 서비스용 인증·요청 제한·운영 구성을 포함하지 않습니다. 기본 서버는 로컬 주소에만 바인딩합니다.
 - 목록은 현재 페이지 메모리에만 존재합니다. 새로고침·탭 종료 시 사라지며 다른 사용자나 기기와 공유되지 않습니다.
-- 기본 정렬은 최신 분석순입니다. 우선순위순을 선택하면 Level 1→4 순서로 표시하고, 같은 Level에서는 최신 분석 결과를 먼저 보여 줍니다.
+- 기본 정렬은 최신 분석순입니다. 우선순위순은 **처리 우선순위** Level 1→4 순서이며, 같은 Level에서는 최신 분석 결과를 먼저 보여 줍니다.
+- 운영 규칙은 React 메모리에 하나만 유지됩니다. 수정·해제는 이후 분석에만 적용되고 과거 결과·적용 사유는 유지됩니다. 날짜 설정, 여러 규칙, 저장·로그인·알림 기능은 포함하지 않습니다.
 - 배포 관리, 알림 전송, 게시글 수정·삭제, 영속 DB, 로그인, 카테고리 분류, 담당자 배정, 관리자·통계 화면을 구현하지 않았습니다.
 - 향후 알림은 `PriorityAnalysis`의 `priority.probabilities`, `priority.confidence`, `signals`를 입력으로 받는 별도 정책 계층에서 붙일 수 있습니다. 현재는 구조만 보존하며 알림 정책·전송 로직은 없습니다.
