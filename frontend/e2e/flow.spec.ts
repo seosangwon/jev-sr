@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 const samples: {level: string; confidence?: number}[] = JSON.parse(readFileSync(new URL('../../samples/posts.json', import.meta.url), 'utf8'));
 
 test('all synthetic scenarios traverse browser, Vite proxy and FastAPI without API key', async ({ page }) => {
+  let analyzeRequests = 0;
+  page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/api/analyze-priority')) analyzeRequests += 1; });
   await page.goto('/');
   await expect(page.getByText('● Mock 모드')).toBeVisible();
   for (const [i, sample] of samples.entries()) {
@@ -27,6 +29,17 @@ test('all synthetic scenarios traverse browser, Vite proxy and FastAPI without A
   const sortedLevels = await page.getByRole('listitem').locator('.priority-badge').allTextContents();
   expect(sortedLevels.map(text => Number(text.match(/Level (\d)/)?.[1]))).toEqual([...sortedLevels].map(text => Number(text.match(/Level (\d)/)?.[1])).sort((a,b) => a-b));
   await expect(page.getByRole('listitem').first()).toContainText('Level 1 · 긴급');
+  const requestsBeforeDetail = analyzeRequests;
+  await page.getByRole('listitem').first().getByRole('button').click();
+  await expect(page.getByRole('heading',{name:'질의 상세'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'원본 질의'})).toBeVisible();
+  await expect(page.getByRole('meter')).toHaveCount(4);
+  await expect(page.getByText('Mock 분석 결과',{exact:true})).toBeVisible();
+  expect(analyzeRequests).toBe(requestsBeforeDetail);
+  await page.screenshot({path:'test-results/query-detail-desktop.png',fullPage:true});
+  await page.getByRole('button',{name:/목록으로 돌아가기/}).click();
+  await expect(page.getByRole('combobox',{name:'질의 정렬 기준'})).toHaveValue('priority');
+  await expect(page.getByRole('listitem').first()).toContainText('Level 1 · 긴급');
   await page.getByRole('combobox',{name:'질의 정렬 기준'}).selectOption('newest');
   await expect(page.getByRole('listitem').first()).toContainText('주요 결재 기능 처리 지연');
   await page.screenshot({path:'test-results/query-list-desktop.png',fullPage:true});
@@ -42,6 +55,8 @@ test('mobile layout and client validation', async ({ page }) => {
   await expect(page.getByText('Mock 분석 결과',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:/질의 목록 1/}).click();
   await expect(page.getByRole('listitem')).toHaveCount(1);
+  await page.getByRole('listitem').first().getByRole('button').click();
+  await expect(page.getByRole('heading',{name:'질의 상세'})).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.screenshot({path:'test-results/query-list-mobile.png',fullPage:true});
+  await page.screenshot({path:'test-results/query-detail-mobile.png',fullPage:true});
 });
