@@ -147,48 +147,6 @@ it('adds only successful analyses and lists them newest first', async () => {
   expect(fetch).toHaveBeenCalledTimes(callsBeforeSort);
   await userEvent.selectOptions(screen.getByRole('combobox',{name:'질의 정렬 기준'}),'newest');
   expect(screen.getAllByRole('listitem')[0]).toHaveTextContent(samples[3].post.title);
-
-  await userEvent.selectOptions(screen.getByRole('combobox',{name:'질의 정렬 기준'}),'priority');
-  await userEvent.click(screen.getByRole('button',{name:samples[0].post.title}));
-  expect(screen.getByRole('heading',{name:'질의 상세'})).toHaveFocus();
-  expect(screen.getByText(samples[0].post.content)).toBeInTheDocument();
-  expect(screen.getByRole('heading',{name:'Level 1 · 긴급'})).toBeInTheDocument();
-  expect(screen.getAllByRole('meter')).toHaveLength(4);
-  expect(fetch).toHaveBeenCalledTimes(callsBeforeSort);
-  await userEvent.click(screen.getByRole('button',{name:/목록으로 돌아가기/}));
-  expect(screen.getByRole('combobox',{name:'질의 정렬 기준'})).toHaveValue('priority');
-  expect(screen.getAllByRole('listitem')[0]).toHaveTextContent(samples[0].post.title);
-  await userEvent.click(screen.getByRole('button',{name:'새 분석'}));
-  expect(screen.getByLabelText(/제목/)).toHaveValue(samples[3].post.title);
-  expect(screen.getByLabelText(/내용/)).toHaveValue(samples[3].post.content);
-  await userEvent.click(screen.getByRole('button',{name:/질의 목록 2/}));
-  expect(screen.getByRole('combobox',{name:'질의 정렬 기준'})).toHaveValue('priority');
-});
-
-it.each(['mock','jev'] as const)('shows the original post and %s analysis in read-only detail', async provider => {
-  const analysis: Analysis = {...result, provider};
-  const fetch = mockFetch(async () => ok(analysis), provider);
-  render(<App/>);
-  await screen.findByText(provider === 'mock' ? '● Mock 모드' : '● Jev 모드');
-  for (const [field, value] of Object.entries(samples[0].post)) {
-    fireEvent.change(document.getElementById(field)!, {target:{value}});
-  }
-  await userEvent.click(screen.getByRole('button',{name:/Jev로 우선순위 분석/}));
-  await screen.findByText(provider === 'mock' ? 'Mock 분석 결과' : 'Jev 분석 결과');
-  await userEvent.click(screen.getByRole('button',{name:/질의 목록 1/}));
-  const callsBeforeDetail = fetch.mock.calls.length;
-  await userEvent.click(screen.getByRole('button',{name:samples[0].post.title}));
-  expect(screen.getByRole('heading',{name:'질의 상세'})).toBeInTheDocument();
-  expect(screen.getByRole('heading',{name:'원본 질의'})).toBeInTheDocument();
-  expect(screen.getByText(samples[0].post.targetInfo)).toBeInTheDocument();
-  expect(screen.getByText(samples[0].post.title)).toBeInTheDocument();
-  expect(screen.getByText(samples[0].post.content)).toBeInTheDocument();
-  expect(screen.getByText(provider === 'mock' ? 'Mock 분석 결과' : 'Jev 분석 결과')).toBeInTheDocument();
-  expect(screen.getAllByRole('meter')).toHaveLength(4);
-  expect(screen.getByText('91%')).toBeInTheDocument();
-  expect(screen.getByText('특정 팀')).toBeInTheDocument();
-  expect(screen.getByText(/분석 시각 ·/)).toBeInTheDocument();
-  expect(fetch).toHaveBeenCalledTimes(callsBeforeDetail);
 });
 
 it('does not add failed requests to the query list', async () => {

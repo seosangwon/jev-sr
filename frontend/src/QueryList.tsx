@@ -1,17 +1,16 @@
+import { useState } from 'react';
 import { labels } from './api';
 import { sortQueryRecords, type QueryRecord, type QuerySort } from './history';
 
 type Props = {
   records: QueryRecord[];
-  sort: QuerySort;
-  onSortChange: (sort: QuerySort) => void;
-  onSelect: (id: number) => void;
   onAnalyze: () => void;
 };
 
 const pct = (value: number) => `${Math.round(value * 100)}%`;
 
-export default function QueryList({ records, sort, onSortChange, onSelect, onAnalyze }: Props) {
+export default function QueryList({ records, onAnalyze }: Props) {
+  const [sort, setSort] = useState<QuerySort>('newest');
   const sortedRecords = sortQueryRecords(records, sort);
 
   return <>
@@ -30,7 +29,7 @@ export default function QueryList({ records, sort, onSortChange, onSelect, onAna
       <div className="section-heading list-heading">
         <div><span className="step">{String(records.length).padStart(2, '0')}</span><h2 id="query-list-heading">질의 목록</h2></div>
         <label className="sort-label">정렬 기준
-          <select aria-label="질의 정렬 기준" value={sort} onChange={event => onSortChange(event.target.value as QuerySort)}>
+          <select aria-label="질의 정렬 기준" value={sort} onChange={event => setSort(event.target.value as QuerySort)}>
             <option value="newest">최신 분석순</option>
             <option value="priority">우선순위순</option>
           </select>
@@ -55,7 +54,7 @@ export default function QueryList({ records, sort, onSortChange, onSelect, onAna
             </div>
             <div className="query-copy">
               <div className="query-title-line">
-                <h3><button type="button" className="query-title-button" onClick={() => onSelect(record.id)}>{post.title}</button></h3>
+                <h3>{post.title}</h3>
                 <span className={`priority-badge ${level}`}>Level {level.slice(-1)} · {labels[level]}</span>
               </div>
               <p className="query-target">대상 · {post.targetInfo}</p>

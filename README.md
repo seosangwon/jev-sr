@@ -29,7 +29,7 @@ npm run dev --prefix frontend
 2. `Jev로 우선순위 분석`을 누르면 Level 1과 네 확률 막대가 표시됩니다.
 3. **급여 조회 방법 문의**는 Level 4로 표시됩니다.
 4. **모호한 내용 / 낮은 신뢰도**는 Level 3과 추가 확인 안내를 표시합니다.
-5. 여러 질의를 분석한 뒤 상단 `질의 목록`을 누르면 최근 분석한 순서로 결과가 표시됩니다. `정렬 기준`에서 `우선순위순`을 선택하면 Level 1부터 볼 수 있습니다. 제목을 누르면 원래 입력과 전체 분석 결과를 다시 볼 수 있고, `목록으로 돌아가기`를 누르면 선택했던 정렬 순서가 유지됩니다.
+5. 여러 질의를 분석한 뒤 상단 `질의 목록`을 누르면 최근 분석한 순서로 결과가 표시됩니다. `정렬 기준`에서 `우선순위순`을 선택하면 Level 1부터 볼 수 있습니다.
 6. 초기화 후 새 입력을 작성할 수 있습니다. 입력·결과·목록은 브라우저 메모리에만 유지되며 새로고침하면 사라집니다.
 
 [samples/posts.json](samples/posts.json)에 기본·경계 사례 12개를 제공합니다. 모두 합성 데이터입니다. Mock은 세 필드가 일치하는 예제의 결과를 재생합니다(앞뒤 공백은 무시). **예제를 수정하거나 다른 글을 입력하면 Level 3·낮은 신뢰도의 고정 시연 결과를 반환합니다.** 키워드 분류기나 실제 AI가 아니며 자유 입력에 대한 의미 분석 정확도를 검증하는 모드가 아닙니다. 시간 정보만 현재 시각이며 나머지 결과는 결정론적입니다.
@@ -60,7 +60,7 @@ cp .env.example .env
 
 ```text
 React + TypeScript + Vite
-  ├─ 성공한 분석 → 세션 질의 목록 → 최신 분석순(기본) 또는 우선순위순 → 읽기 전용 상세
+  ├─ 성공한 분석 → 세션 질의 목록 → 최신 분석순(기본) 또는 우선순위순
   ├─ GET /api/config             → 공개 Provider/신뢰도 기준
   └─ POST /api/analyze-priority  → FastAPI 입력 검증
                                    └─ PriorityAnalyzer 인터페이스
@@ -77,9 +77,8 @@ React + TypeScript + Vite
 | `backend/app/questions.py` | 구조화된 상태와 독립 질문 5개 |
 | `backend/app/providers.py` | Provider 인터페이스, Jev/Mock, SDK 응답 검증·변환 |
 | `backend/app/config.py` | 서버 환경 설정 및 기준값 검증 |
-| `frontend/src/App.tsx` | 입력·로딩·재시도·초기화·화면 전환 상태 |
-| `frontend/src/AnalysisResult.tsx` | 현재 결과와 상세 화면이 공유하는 분석 결과 표시 |
-| `frontend/src/QueryList.tsx`, `frontend/src/QueryDetail.tsx` | 세션 목록과 읽기 전용 상세 화면 |
+| `frontend/src/App.tsx` | 입력·로딩·재시도·초기화·결과 UI |
+| `frontend/src/QueryList.tsx` | 현재 세션의 질의 목록 화면 |
 | `frontend/src/history.ts` | 목록 모델과 최신 분석순·우선순위순 정렬 |
 | `frontend/src/api.ts` | 클라이언트 검증, API 호출 및 런타임 응답 검증 |
 | `samples/posts.json` | Mock 및 시연·테스트에 공유하는 합성 사례 |
@@ -161,7 +160,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-이 테스트는 테스트 프로세스의 Provider를 Mock으로 고정하고 키를 비웁니다. 외부 Jev 호출 없이 12개 사례의 분석·목록 누적·최신순/우선순위순 정렬·상세 열람과 모바일 화면을 확인합니다. SDK 계약 테스트 역시 공식 SDK와 HTTP 모의 transport를 연결하며 실제 API 비용이 발생하지 않습니다.
+이 테스트는 테스트 프로세스의 Provider를 Mock으로 고정하고 키를 비웁니다. 외부 Jev 호출 없이 12개 사례의 분석·목록 누적·최신순/우선순위순 정렬과 모바일 화면을 확인합니다. SDK 계약 테스트 역시 공식 SDK와 HTTP 모의 transport를 연결하며 실제 API 비용이 발생하지 않습니다.
 
 ## 제약과 확장 지점
 
@@ -170,6 +169,5 @@ npm run test:e2e
 - 개발용 MVP이며 공개 서비스용 인증·요청 제한·운영 구성을 포함하지 않습니다. 기본 서버는 로컬 주소에만 바인딩합니다.
 - 목록은 현재 페이지 메모리에만 존재합니다. 새로고침·탭 종료 시 사라지며 다른 사용자나 기기와 공유되지 않습니다.
 - 기본 정렬은 최신 분석순입니다. 우선순위순을 선택하면 Level 1→4 순서로 표시하고, 같은 Level에서는 최신 분석 결과를 먼저 보여 줍니다.
-- 목록 상세 보기는 현재 세션의 결과를 다시 표시합니다. 목록의 정렬 기준과 작성 중인 입력은 유지되며 API를 다시 호출하지 않습니다.
 - 배포 관리, 알림 전송, 게시글 수정·삭제, 영속 DB, 로그인, 카테고리 분류, 담당자 배정, 관리자·통계 화면을 구현하지 않았습니다.
 - 향후 알림은 `PriorityAnalysis`의 `priority.probabilities`, `priority.confidence`, `signals`를 입력으로 받는 별도 정책 계층에서 붙일 수 있습니다. 현재는 구조만 보존하며 알림 정책·전송 로직은 없습니다.
