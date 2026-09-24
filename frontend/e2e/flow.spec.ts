@@ -21,7 +21,13 @@ test('all synthetic scenarios traverse browser, Vite proxy and FastAPI without A
   await expect(page.getByRole('heading',{name:'질의 목록'})).toBeVisible();
   await expect(page.getByRole('listitem')).toHaveCount(12);
   await expect(page.getByRole('combobox',{name:'질의 정렬 기준'})).toHaveValue('newest');
-  await expect(page.getByRole('option',{name:'우선순위순 · 준비 중'})).toHaveAttribute('disabled','');
+  await expect(page.getByRole('option',{name:'우선순위순'})).toBeEnabled();
+  await expect(page.getByRole('listitem').first()).toContainText('주요 결재 기능 처리 지연');
+  await page.getByRole('combobox',{name:'질의 정렬 기준'}).selectOption('priority');
+  const sortedLevels = await page.getByRole('listitem').locator('.priority-badge').allTextContents();
+  expect(sortedLevels.map(text => Number(text.match(/Level (\d)/)?.[1]))).toEqual([...sortedLevels].map(text => Number(text.match(/Level (\d)/)?.[1])).sort((a,b) => a-b));
+  await expect(page.getByRole('listitem').first()).toContainText('Level 1 · 긴급');
+  await page.getByRole('combobox',{name:'질의 정렬 기준'}).selectOption('newest');
   await expect(page.getByRole('listitem').first()).toContainText('주요 결재 기능 처리 지연');
   await page.screenshot({path:'test-results/query-list-desktop.png',fullPage:true});
 });

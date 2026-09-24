@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { labels } from './api';
 import { sortQueryRecords, type QueryRecord, type QuerySort } from './history';
 
@@ -9,7 +10,7 @@ type Props = {
 const pct = (value: number) => `${Math.round(value * 100)}%`;
 
 export default function QueryList({ records, onAnalyze }: Props) {
-  const sort: QuerySort = 'newest';
+  const [sort, setSort] = useState<QuerySort>('newest');
   const sortedRecords = sortQueryRecords(records, sort);
 
   return <>
@@ -18,7 +19,7 @@ export default function QueryList({ records, onAnalyze }: Props) {
       <div className="list-title-row">
         <div>
           <h1>분석한 질의를 모아보세요.</h1>
-          <p>현재 브라우저 화면에서 분석한 결과를 최신순으로 확인할 수 있습니다.</p>
+          <p>현재 브라우저 화면에서 분석한 결과를 최신순 또는 우선순위순으로 확인할 수 있습니다.</p>
         </div>
         <button type="button" className="primary" onClick={onAnalyze}>새 질의 분석 <span aria-hidden="true">＋</span></button>
       </div>
@@ -28,9 +29,9 @@ export default function QueryList({ records, onAnalyze }: Props) {
       <div className="section-heading list-heading">
         <div><span className="step">{String(records.length).padStart(2, '0')}</span><h2 id="query-list-heading">질의 목록</h2></div>
         <label className="sort-label">정렬 기준
-          <select aria-label="질의 정렬 기준" defaultValue={sort}>
+          <select aria-label="질의 정렬 기준" value={sort} onChange={event => setSort(event.target.value as QuerySort)}>
             <option value="newest">최신 분석순</option>
-            <option value="priority" disabled>우선순위순 · 준비 중</option>
+            <option value="priority">우선순위순</option>
           </select>
         </label>
       </div>

@@ -108,7 +108,7 @@ it('shows an empty query list and returns to analysis', async () => {
   expect(screen.getByRole('heading',{name:'질의 목록'})).toBeInTheDocument();
   expect(screen.getByText('아직 분석한 질의가 없습니다.')).toBeInTheDocument();
   expect(screen.getByRole('combobox',{name:'질의 정렬 기준'})).toHaveValue('newest');
-  expect(screen.getByRole('option',{name:'우선순위순 · 준비 중'})).toBeDisabled();
+  expect(screen.getByRole('option',{name:'우선순위순'})).toBeEnabled();
   await userEvent.click(screen.getByRole('button',{name:'첫 질의 분석하기'}));
   expect(screen.getByRole('heading',{name:'게시글 작성'})).toBeInTheDocument();
 });
@@ -119,7 +119,7 @@ it('adds only successful analyses and lists them newest first', async () => {
     {...result, analyzedAt:'2026-09-21T12:00:00Z'},
     {...result, priority:{...result.priority, level:'level_4' as const, label:'낮음'}, analyzedAt:'2026-09-21T13:00:00Z'},
   ];
-  vi.spyOn(globalThis,'fetch').mockImplementation(async input => input==='/api/config'
+  const fetch = vi.spyOn(globalThis,'fetch').mockImplementation(async input => input==='/api/config'
     ? ok({provider:'mock',lowConfidenceThreshold:.6})
     : ok(responses[analysisCall++]));
   render(<App/>); await screen.findByText('● Mock 모드');
@@ -139,6 +139,14 @@ it('adds only successful analyses and lists them newest first', async () => {
   expect(items[1]).toHaveTextContent(samples[0].post.title);
   expect(items[1]).toHaveTextContent('Level 1 · 긴급');
   expect(items[0]).toHaveTextContent('Mock');
+
+  const callsBeforeSort = fetch.mock.calls.length;
+  await userEvent.selectOptions(screen.getByRole('combobox',{name:'질의 정렬 기준'}),'priority');
+  expect(screen.getAllByRole('listitem')[0]).toHaveTextContent(samples[0].post.title);
+  expect(screen.getAllByRole('listitem')[1]).toHaveTextContent(samples[3].post.title);
+  expect(fetch).toHaveBeenCalledTimes(callsBeforeSort);
+  await userEvent.selectOptions(screen.getByRole('combobox',{name:'질의 정렬 기준'}),'newest');
+  expect(screen.getAllByRole('listitem')[0]).toHaveTextContent(samples[3].post.title);
 });
 
 it('does not add failed requests to the query list', async () => {
@@ -154,4 +162,20 @@ it('uses record id as a stable newest-first tie breaker', () => {
   const first: QueryRecord = {id:1,post:samples[0].post,analysis:result};
   const second: QueryRecord = {id:2,post:samples[1].post,analysis:result};
   expect(sortQueryRecords([first,second],'newest').map(record => record.id)).toEqual([2,1]);
+});
+
+it('sorts priority from Level 1 to 4, then newest and record id without changing the source', () => {
+  const record = (id: number, level: Analysis['priority']['level'], analyzedAt: string): QueryRecord => ({
+    id, post: samples[0].post, analysis: {...result, priority: {...result.priority, level}, analyzedAt},
+  });
+  const records = [
+    record(1,'level_4','2026-09-21T15:00:00Z'),
+    record(2,'level_2','2026-09-21T13:00:00Z'),
+    record(3,'level_1','2026-09-21T10:00:00Z'),
+    record(4,'level_2','2026-09-21T14:00:00Z'),
+    record(5,'level_3','2026-09-21T16:00:00Z'),
+    record(6,'level_2','2026-09-21T14:00:00Z'),
+  ];
+  expect(sortQueryRecords(records,'priority').map(item => item.id)).toEqual([3,6,4,2,5,1]);
+  expect(records.map(item => item.id)).toEqual([1,2,3,4,5,6]);
 });
