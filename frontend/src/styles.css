@@ -11,6 +11,10 @@
 .rule-reason{margin:14px 0 0}
 .query-origin{font-size:10px;color:#6c7e9a;margin:5px 0 0}
 .query-rule{font-size:10px;color:#47689c;margin:3px 0 0}
+.notification-status{font-size:12px;padding:11px 13px;margin:14px 0 0;border-radius:7px;background:#eff8f4;color:#237255;border:1px solid #d7ecdf}
+.notification-status.failed,.notification-status.not_configured{background:#fff5f2;color:#a04738;border-color:#f1d7cf}
+.notification-status.simulated{background:#f3f6fa;color:#5d6e86;border-color:#e1e7ef}
+.query-notification{font-size:10px;color:#5e708c;margin:3px 0 0}
 @media(max-width:680px){.app-nav button{padding:7px 5px;font-size:10px}.brand{font-size:18px;gap:5px}.brand-icon{width:28px;height:28px;font-size:21px;line-height:27px}.result-overview{gap:10px}.confidence{flex:0 0 auto}}
 .query-title-button{display:block;max-width:100%;padding:0;background:transparent;color:inherit;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .query-title-button:hover{text-decoration:underline;color:#315fb5}

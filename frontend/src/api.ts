@@ -18,6 +18,7 @@ const probability = z.number().finite().min(0).max(1);
 const schema = z.object({
   priority: z.object({ level: z.enum(levels), label: z.string(), confidence: probability, probabilities: z.object({ level_1: probability, level_2: probability, level_3: probability, level_4: probability }) }),
   handlingPriority: z.object({ level: z.enum(levels), source: z.enum(['base', 'operating_rule']), ruleTopic: z.string().nullable(), matchProbability: probability.nullable() }),
+  notificationStatus: z.enum(['not_required', 'simulated', 'not_configured', 'sent', 'failed']),
   signals: z.object({ payrollDisrupted: probability, requiredFunctionUnavailable: probability, workBlocked: probability, impactScope: z.enum(['individual', 'team', 'many_users', 'organization_wide', 'unknown']), impactScopeConfidence: probability }),
   analyzedAt: z.string().datetime({ offset: true }), provider: z.enum(['mock', 'jev']),
 }).refine(r => Math.abs(Object.values(r.priority.probabilities).reduce((a, b) => a + b, 0) - 1) < 0.01);

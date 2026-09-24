@@ -8,6 +8,7 @@ import samples from '../../samples/posts.json';
 const result: Analysis = {
   priority: {level:'level_1',label:'긴급',confidence:.91,probabilities:{level_1:.87,level_2:.1,level_3:.02,level_4:.01}},
   handlingPriority: {level:'level_1',source:'base',ruleTopic:null,matchProbability:null},
+  notificationStatus:'simulated',
   signals:{payrollDisrupted:.94,requiredFunctionUnavailable:.86,workBlocked:.92,impactScope:'team',impactScopeConfidence:.82},
   analyzedAt:'2026-09-21T12:00:00Z',provider:'mock',
 };
@@ -68,11 +69,21 @@ it('does not warn at the configured threshold',async () => {
   await screen.findByText('Mock 분석 결과'); expect(screen.queryByText(/판단 신뢰도가 낮습니다/)).not.toBeInTheDocument();
 });
 it('shows Jev provenance',async () => {
-  mockFetch(async () => ok({...result,provider:'jev'}),'jev'); render(<App/>); await screen.findByText('● Jev 모드');
+  mockFetch(async () => ok({...result,provider:'jev',notificationStatus:'not_configured'}),'jev'); render(<App/>); await screen.findByText('● Jev 모드');
   for(const [key,value] of Object.entries(samples[0].post)) fireEvent.change(document.getElementById(key)!,{target:{value}});
   await userEvent.click(screen.getByRole('button',{name:/Jev로 우선순위 분석/}));
   expect(await screen.findByText('Jev 분석 결과')).toBeInTheDocument(); expect(screen.getByText('Jev 판단 신뢰도')).toBeInTheDocument();
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+});
+it('keeps a successful analysis and shows a Discord delivery failure',async () => {
+  mockFetch(async () => ok({...result,provider:'jev',notificationStatus:'failed'}),'jev');
+  render(<App/>); await screen.findByText('● Jev 모드');
+  for (const [key,value] of Object.entries(samples[0].post)) fireEvent.change(document.getElementById(key)!,{target:{value}});
+  await userEvent.click(screen.getByRole('button',{name:/Jev로 우선순위 분석/}));
+  expect(await screen.findByText(/Discord 알림을 보내지 못했습니다/)).toBeInTheDocument();
+  expect(screen.getAllByRole('meter')).toHaveLength(4);
+  await userEvent.click(screen.getByRole('button',{name:/질의 목록 1/}));
+  expect(screen.getByText('알림 · 전송 실패')).toBeInTheDocument();
 });
 it('keeps input on error and retries without inventing a result',async () => {
   let calls=0; mockFetch(async () => ++calls===1 ? new Response(JSON.stringify({error:{code:'JEV_TIMEOUT',message:'Jev 요청 시간이 초과되었습니다.'}}),{status:504}) : ok(result)); await start();

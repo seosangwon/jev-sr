@@ -11,6 +11,7 @@ test('all synthetic scenarios traverse browser, Vite proxy and FastAPI without A
     await expect(page.getByText('Mock 분석 결과', {exact:true})).toBeVisible();
     await expect(page.getByRole('heading', {name: new RegExp(`Level ${sample.level.slice(-1)} ·`)})).toBeVisible();
     await expect(page.getByRole('meter')).toHaveCount(4);
+    if (sample.level === 'level_1') await expect(page.getByText(/Mock 시연: Level 1 알림 조건/)).toBeVisible();
     if (i === 0) await page.screenshot({path:'test-results/demo-desktop.png',fullPage:true});
     if ('confidence' in sample) await expect(page.getByText(/판단 신뢰도가 낮습니다/)).toBeVisible();
   }
@@ -44,6 +45,7 @@ test('session rule promotes only the matching new query and retains original urg
   await expect(page.getByRole('heading',{name:'Level 1 · 긴급'})).toBeVisible();
   await expect(page.getByText(/Mock 업무 긴급도 · Level 4/)).toBeVisible();
   await expect(page.getByText(/주제 관련성 96%/)).toBeVisible();
+  await expect(page.getByText(/Mock 시연: Level 1 알림 조건/)).toBeVisible();
   await page.getByRole('button',{name:/질의 목록 1/}).click();
   await expect(page.getByRole('listitem').first()).toContainText('운영 규칙 적용');
   await page.getByRole('combobox',{name:'질의 정렬 기준'}).selectOption('priority');

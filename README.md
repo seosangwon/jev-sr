@@ -33,6 +33,8 @@ npm run dev --prefix frontend
 6. `운영 규칙`에서 `시연 주제 채우기` → `규칙 저장`을 누르고, `새 분석`에서 **종사자 변경보고 사용법 문의** 예제를 분석하세요. 원래 Mock 긴급도는 Level 4, 관련성 고정 시연값은 96%, 처리 우선순위는 Level 1입니다.
 7. 초기화 후 새 입력을 작성할 수 있습니다. 입력·결과·목록·운영 규칙은 브라우저 메모리에만 유지되며 새로고침하면 사라집니다.
 
+Mock 모드에서 처리 Level 1은 알림 조건과 메시지 상태만 시연합니다. **실제 Discord 메시지는 보내지 않습니다.**
+
 운영 규칙 입력은 자유 명령 프롬프트가 아니라 **비교할 주제 설명**입니다. 예를 들어 “장기요양기관 대장 인력현황 기능 관련 질의”처럼 기능·업무명 위주로 적습니다. Jev가 별도 질문에서 매긴 관련성 확률이 80% 미만이면 처리 Level은 원래 긴급도와 같습니다. 원래 긴급도가 이미 Level 1인 경우에도 Level은 그대로입니다. 목록의 `Jev 긴급도 신뢰도`는 관련성 확률이나 정답률이 아니라 Jev가 선택한 긴급도 확률 분포의 집중도입니다.
 
 [samples/posts.json](samples/posts.json)에 기본·경계 사례 13개를 제공합니다. 모두 합성 데이터입니다. Mock은 세 필드가 일치하는 예제의 결과를 재생합니다(앞뒤 공백은 무시). **예제를 수정하거나 다른 글을 입력하면 Level 3·낮은 신뢰도의 고정 시연 결과를 반환합니다.** 키워드 분류기나 실제 AI가 아니며 자유 입력에 대한 의미 분석 정확도를 검증하는 모드가 아닙니다. 시간 정보만 현재 시각이며 나머지 결과는 결정론적입니다. 운영 규칙 관련성은 [samples/rule_matches.json](samples/rule_matches.json)의 주제·질의 조합에만 고정값을 사용하고 다른 조합은 불확실한 50%를 표시합니다.
@@ -48,6 +50,11 @@ cp .env.example .env
 - `PRIORITY_ANALYZER`: `mock` 또는 `jev`. 기본값 `mock`.
 - `TYPESAFE_API_KEY`: 실제 Jev 호출에 사용할 TypeSafe 키. 프론트엔드가 아닌 서버에만 설정합니다.
 - `LOW_CONFIDENCE_THRESHOLD`: 0~1 사이 값. 기본값 0.60. 결과 신뢰도가 **미만**일 때 추가 확인 안내를 표시합니다.
+- `DISCORD_WEBHOOK_URL`: 선택 사항. Jev 모드에서 처리 Level 1을 Discord 비공개 채널에 알릴 웹훅 URL. 미설정 시 분석은 정상 완료되고 `웹훅 설정 필요` 상태가 표시됩니다.
+
+Discord에서 비공개 채널을 만든 뒤 채널 설정의 **연동 → 웹훅**에서 URL을 생성해 서버의 `.env`에 `DISCORD_WEBHOOK_URL=...`으로 저장합니다. 담당자를 채널에 초대하고 담당자의 채널 알림을 **모든 메시지**로 설정해야 새 메시지의 푸시 알림을 받을 수 있습니다. 웹훅은 채널에 게시할 뿐 개인 DM이나 알림 설정 변경을 대신하지 않습니다. URL은 비밀값이므로 프론트엔드나 Git에 넣지 마세요. 설정 후 백엔드를 재시작합니다. [Discord 웹훅 공식 문서](https://docs.discord.com/developers/platform/webhooks)
+
+전송 메시지에는 **질의 제목**, 원래 Jev Level, 처리 Level, 적용 사유, 분석 시각만 들어갑니다. 대상자 정보와 본문은 보내지 않습니다. 제목에 개인정보가 들어갈 수 있으므로 채널 접근 범위를 확인하세요. 전송 성공은 Discord가 메시지 ID를 돌려주는 `wait=true` 응답으로 확인합니다. 실패해도 분석 결과는 유지하고 실패 상태를 표시합니다. [Discord Execute Webhook](https://docs.discord.com/developers/resources/webhook)
 
 `.env`에서 Provider를 `jev`로 바꾸고 발급받은 키를 로컬 편집기로 입력한 다음, 기존 백엔드를 종료하고 아래 명령으로 시작합니다. `.env` 파일은 자동으로 읽지 않으므로 `--env-file`이 필요합니다. 키를 명령줄이나 Git에 넣지 마세요.
 
@@ -72,7 +79,8 @@ React + TypeScript + Vite
                                        └─ JevPriorityAnalyzer  → 공식 typesafe-sdk
                                                                   → Jev
                                    └─ 규칙이 있으면 별도 Jev Noul / Mock 고정 관련성
-                                   ← 원래 PriorityAnalysis + handlingPriority 응답
+                                   └─ 처리 Level 1이면 Discord 웹훅 전송 (Mock은 시연만)
+                                   ← 원래 PriorityAnalysis + handlingPriority + 알림 상태
 ```
 
 | 파일 | 역할 |
@@ -82,6 +90,7 @@ React + TypeScript + Vite
 | `backend/app/questions.py` | 구조화된 상태와 독립 질문 5개 |
 | `backend/app/providers.py` | Provider 인터페이스, Jev/Mock, SDK 응답 검증·변환 |
 | `backend/app/config.py` | 서버 환경 설정 및 기준값 검증 |
+| `backend/app/notifications.py` | Discord 메시지 구성·전송·확인 |
 | `frontend/src/App.tsx` | 입력·로딩·재시도·초기화·결과 UI |
 | `frontend/src/QueryList.tsx` | 현재 세션의 질의 목록 화면 |
 | `frontend/src/QueryDetail.tsx` | 원래 입력과 당시 분석 결과를 읽기 전용으로 표시 |
@@ -92,6 +101,7 @@ React + TypeScript + Vite
 | `samples/posts.json` | Mock 및 시연·테스트에 공유하는 합성 사례 |
 | `samples/rule_matches.json` | Mock 규칙 관련성의 합성 고정 결과 |
 | `backend/tests/test_priority.py` | 입력·Provider·SDK HTTP 계약·변환·오류 테스트 |
+| `backend/tests/test_notifications.py` | Level 1 전송 조건·메시지·실패 처리 테스트 |
 | `frontend/src/App.test.tsx` | UI 흐름·입력 경계·실패·재시도 테스트 |
 | `frontend/e2e/flow.spec.ts` | 실제 브라우저와 FastAPI를 연결하는 데모 테스트 |
 | `docs/verification.md` | 기획서 완료 조건별 검증 결과와 제약 |
@@ -137,7 +147,7 @@ SDK의 `confidence`는 선택 확률과 별개인 분포 집중도의 지표이�
 
 각 필드는 필수 문자열이며, 대상자 500자·제목 200자·내용 5,000자까지 허용합니다. 앞뒤 공백 제거 전 길이를 검증하고 공백만 있는 값은 거절합니다. 프론트엔드와 Python 모두 Unicode 코드 포인트 수를 사용합니다(이모지도 양쪽에서 동일하게 계산). 프론트엔드는 초과 입력을 숨기거나 잘라내지 않고 구체적 오류를 표시합니다.
 
-성공 응답은 기획서의 `priority`, `signals`, `analyzedAt`, `provider`에 `handlingPriority`를 더한 구조를 따릅니다. 선택적 요청 필드 `operatingRuleTopic`은 1~200자의 주제 설명입니다. 응답의 `handlingPriority`에는 처리 Level, `base`/`operating_rule` 출처, 당시 주제와 관련성 확률이 들어갑니다. 규칙이 없으면 주제·확률은 null입니다. 오류는 `{"error":{"code":"...","message":"...","fields":{...}}}` 형태이며, `fields`는 입력 오류에만 있습니다. 관련성 호출이 실패하면 전체 분석이 실패하므로 부분 성공 결과는 반환하지 않습니다.
+성공 응답은 기획서의 `priority`, `signals`, `analyzedAt`, `provider`에 `handlingPriority`와 `notificationStatus`를 더한 구조를 따릅니다. 선택적 요청 필드 `operatingRuleTopic`은 1~200자의 주제 설명입니다. 응답의 `handlingPriority`에는 처리 Level, `base`/`operating_rule` 출처, 당시 주제와 관련성 확률이 들어갑니다. 규칙이 없으면 주제·확률은 null입니다. 알림 상태는 `not_required`·`simulated`·`not_configured`·`sent`·`failed` 중 하나입니다. 오류는 `{"error":{"code":"...","message":"...","fields":{...}}}` 형태이며, `fields`는 입력 오류에만 있습니다. 관련성 호출이 실패하면 전체 분석이 실패하므로 부분 성공 결과는 반환하지 않습니다.
 
 | HTTP | 코드 | 사용자 조치 |
 |---|---|---|
@@ -169,7 +179,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-이 테스트는 테스트 프로세스의 Provider를 Mock으로 고정하고 키를 비웁니다. 외부 Jev 호출 없이 13개 사례의 분석·목록 누적·최신순/우선순위순 정렬, 운영 규칙 상향과 모바일 화면을 확인합니다. SDK 계약 테스트 역시 공식 SDK와 HTTP 모의 transport를 연결하며 실제 API 비용이 발생하지 않습니다.
+이 테스트는 테스트 프로세스의 Provider를 Mock으로 고정하고 키를 비웁니다. 외부 Jev·Discord 호출 없이 13개 사례의 분석·목록 누적·최신순/우선순위순 정렬, 운영 규칙 상향·알림 시연과 모바일 화면을 확인합니다. SDK 계약 테스트 역시 공식 SDK와 HTTP 모의 transport를 연결하며 실제 API 비용이 발생하지 않습니다.
 
 ## 제약과 확장 지점
 
@@ -178,6 +188,7 @@ npm run test:e2e
 - 개발용 MVP이며 공개 서비스용 인증·요청 제한·운영 구성을 포함하지 않습니다. 기본 서버는 로컬 주소에만 바인딩합니다.
 - 목록은 현재 페이지 메모리에만 존재합니다. 새로고침·탭 종료 시 사라지며 다른 사용자나 기기와 공유되지 않습니다.
 - 기본 정렬은 최신 분석순입니다. 우선순위순은 **처리 우선순위** Level 1→4 순서이며, 같은 Level에서는 최신 분석 결과를 먼저 보여 줍니다.
-- 운영 규칙은 React 메모리에 하나만 유지됩니다. 수정·해제는 이후 분석에만 적용되고 과거 결과·적용 사유는 유지됩니다. 날짜 설정, 여러 규칙, 저장·로그인·알림 기능은 포함하지 않습니다.
-- 배포 관리, 알림 전송, 게시글 수정·삭제, 영속 DB, 로그인, 카테고리 분류, 담당자 배정, 관리자·통계 화면을 구현하지 않았습니다.
-- 향후 알림은 `PriorityAnalysis`의 `priority.probabilities`, `priority.confidence`, `signals`를 입력으로 받는 별도 정책 계층에서 붙일 수 있습니다. 현재는 구조만 보존하며 알림 정책·전송 로직은 없습니다.
+- 운영 규칙은 React 메모리에 하나만 유지됩니다. 수정·해제는 이후 분석에만 적용되고 과거 결과·적용 사유는 유지됩니다. 날짜 설정, 여러 규칙, 저장·로그인은 포함하지 않습니다.
+- Discord 알림은 새 분석 요청마다 최대 한 번 시도합니다. 자동 재시도·영속 중복 방지가 없어 같은 질의를 다시 분석하면 알림이 다시 갈 수 있습니다. 서버가 중지돼 있으면 분석·알림 모두 동작하지 않습니다.
+- 목록은 브라우저 메모리에만 있으므로 다른 기기의 담당자가 알림에서 질의 상세로 이동할 수 없습니다. Discord 채널에 보낸 제목을 보고 별도 방식으로 질의를 확인해야 합니다.
+- 배포 관리, 게시글 수정·삭제, 영속 DB, 로그인, 카테고리 분류, 담당자 자동 배정, 관리자·통계 화면, 이메일·Slack 알림은 구현하지 않았습니다.

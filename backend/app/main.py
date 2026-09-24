@@ -6,16 +6,18 @@ from fastapi.responses import JSONResponse
 
 from .config import Settings
 from .models import AnalysisRequest, AnalysisResponse, HandlingPriority, PostInput
+from .notifications import DiscordWebhookNotifier, Notifier
 from .providers import AnalysisError, JevPriorityAnalyzer, JevRuleMatcher, MockPriorityAnalyzer, MockRuleMatcher, PriorityAnalyzer, RuleMatcher
 
 
 RULE_MATCH_THRESHOLD = 0.8
 
 
-def create_app(settings: Settings | None = None, analyzer: PriorityAnalyzer | None = None, rule_matcher: RuleMatcher | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, analyzer: PriorityAnalyzer | None = None, rule_matcher: RuleMatcher | None = None, notifier: Notifier | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     analyzer = analyzer or (MockPriorityAnalyzer() if settings.provider == "mock" else JevPriorityAnalyzer(settings.api_key))
     rule_matcher = rule_matcher or (MockRuleMatcher() if settings.provider == "mock" else JevRuleMatcher(settings.api_key))
+    notifier = notifier or (DiscordWebhookNotifier(settings.discord_webhook_url) if settings.discord_webhook_url else None)
     app = FastAPI(title="Jev 게시글 우선순위 분석기")
 
     @app.middleware("http")
@@ -62,7 +64,20 @@ def create_app(settings: Settings | None = None, analyzer: PriorityAnalyzer | No
                 source="operating_rule" if matched else "base",
                 ruleTopic=topic, matchProbability=probability,
             )
-        return AnalysisResponse(**original.model_dump(), handlingPriority=handling)
+        if handling.level != "level_1":
+            notification_status = "not_required"
+        elif settings.provider == "mock":
+            notification_status = "simulated"
+        elif notifier is None:
+            notification_status = "not_configured"
+        else:
+            try:
+                sent = await notifier.send(post, original, handling)
+            except Exception:
+                # Notification problems do not replace a valid Jev result.
+                sent = False
+            notification_status = "sent" if sent else "failed"
+        return AnalysisResponse(**original.model_dump(), handlingPriority=handling, notificationStatus=notification_status)
 
     return app
 

@@ -67,3 +67,4 @@ class HandlingPriority(BaseModel):
 
 class AnalysisResponse(PriorityAnalysis):
     handlingPriority: HandlingPriority
+    notificationStatus: Literal["not_required", "simulated", "not_configured", "sent", "failed"]

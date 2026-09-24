@@ -61,6 +61,7 @@ export default function QueryList({ records, sort, onSortChange, onSelect, onAna
               <p className="query-target">대상 · {post.targetInfo}</p>
               <p className="query-origin">{analysis.provider === 'mock' ? 'Mock' : 'Jev'} 긴급도 Level {analysis.priority.level.slice(-1)}{analysis.handlingPriority.source === 'operating_rule' && ' · 운영 규칙 적용'}</p>
               {analysis.handlingPriority.ruleTopic && <p className="query-rule">주제 관련성 {pct(analysis.handlingPriority.matchProbability ?? 0)} · {analysis.handlingPriority.source === 'operating_rule' ? analysis.priority.level === 'level_1' ? '원래 Level 1 유지' : '처리 Level 1 상향' : '기준 80% 미달'}</p>}
+              {analysis.notificationStatus !== 'not_required' && <p className="query-notification">알림 · {analysis.notificationStatus === 'sent' ? 'Discord 전송됨' : analysis.notificationStatus === 'simulated' ? 'Mock 시연' : analysis.notificationStatus === 'not_configured' ? '웹훅 설정 필요' : '전송 실패'}</p>}
               <p className="query-excerpt">{post.content}</p>
             </div>
             <div className="query-confidence"><span>{analysis.provider === 'mock' ? 'Mock' : 'Jev'} 긴급도 신뢰도</span><strong>{pct(analysis.priority.confidence)}</strong></div>
