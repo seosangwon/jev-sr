@@ -51,6 +51,8 @@ cp .env.example .env
 - `TYPESAFE_API_KEY`: 실제 Jev 호출에 사용할 TypeSafe 키. 프론트엔드가 아닌 서버에만 설정합니다.
 - `LOW_CONFIDENCE_THRESHOLD`: 0~1 사이 값. 기본값 0.60. 결과 신뢰도가 **미만**일 때 추가 확인 안내를 표시합니다.
 - `DISCORD_WEBHOOK_URL`: 선택 사항. Jev 모드에서 처리 Level 1을 Discord 비공개 채널에 알릴 웹훅 URL. 미설정 시 분석은 정상 완료되고 `웹훅 설정 필요` 상태가 표시됩니다.
+- `DEPLOY_MODE`: 배포 시 `1`. 빌드된 프론트엔드를 백엔드가 제공하고 공유 암호를 요구합니다. 로컬 기본값은 `0`입니다.
+- `DEMO_PASSWORD`: 배포 모드에 필요한 공유 암호. Git에 저장하지 않습니다.
 
 Discord에서 비공개 채널을 만든 뒤 채널 설정의 **연동 → 웹훅**에서 URL을 생성해 서버의 `.env`에 `DISCORD_WEBHOOK_URL=...`으로 저장합니다. 담당자를 채널에 초대하고 담당자의 채널 알림을 **모든 메시지**로 설정해야 새 메시지의 푸시 알림을 받을 수 있습니다. 웹훅은 채널에 게시할 뿐 개인 DM이나 알림 설정 변경을 대신하지 않습니다. URL은 비밀값이므로 프론트엔드나 Git에 넣지 마세요. 설정 후 백엔드를 재시작합니다. [Discord 웹훅 공식 문서](https://docs.discord.com/developers/platform/webhooks)
 
@@ -63,6 +65,24 @@ Discord에서 비공개 채널을 만든 뒤 채널 설정의 **연동 → 웹�
 ```
 
 설정 변경 후 백엔드를 재시작하고 브라우저를 새로고침하세요. Mock으로 돌아가려면 Provider를 `mock`으로 바꾸고 같은 방법으로 재시작합니다. Jev 모드에 키가 없으면 분석 시 `JEV_MISSING_KEY` 오류를 보여 주며 Mock 결과로 대체하지 않습니다.
+
+## Render 무료 데모 배포
+
+루트 [Dockerfile](Dockerfile)은 Node 20으로 프론트엔드를 빌드하고 Python 3.12에서 FastAPI가 화면과 `/api`를 같은 주소로 제공합니다. [Render](https://render.com/docs/docker)에서 GitHub 저장소 `seosangwon/jev-sr`의 `main` 브랜치를 연결해 **Free Docker Web Service**를 만들고, Health Check Path를 `/healthz`로 설정하세요. Render가 제공하는 `PORT`를 사용합니다. 무료 서비스는 유휴 15분 뒤 중지되므로 첫 접속이 느릴 수 있습니다.
+
+Render의 **Environment**에서 다음 값을 설정합니다. 실제 비밀값은 GitHub나 Dockerfile에 넣지 않습니다.
+
+| 이름 | 값 |
+|---|---|
+| `PRIORITY_ANALYZER` | `jev` |
+| `TYPESAFE_API_KEY` | 본인의 Jev API 키 |
+| `DEMO_PASSWORD` | 시연 대상과 공유할 충분히 긴 임의의 암호 |
+| `DEPLOY_MODE` | Dockerfile의 기본값 `1` 유지 |
+| `DISCORD_WEBHOOK_URL` | 이번 배포에서는 설정하지 않음 |
+
+배포 주소에 접속하면 브라우저 기본 인증창이 열립니다. 사용자 이름은 **`demo`**, 암호는 설정한 `DEMO_PASSWORD`입니다. 화면·API·API 문서 모두 같은 인증을 요구하고 `/healthz`만 공개합니다. 링크와 암호는 신뢰하는 시연 대상에게만 공유하세요. 암호를 바꾸려면 Render 환경변수를 수정하고 다시 배포합니다. 이 공유 암호는 개인별 계정이나 세밀한 권한 관리가 아니므로 공개 서비스용 인증으로 간주하지 않습니다. Jev API 사용량은 Render 무료 플랜과 별도로 발생합니다.
+
+Discord 웹훅을 설정하지 않아도 분석과 운영 규칙은 동작합니다. Level 1 알림 상태는 `웹훅 설정 필요`로 표시됩니다. 목록과 규칙은 각 브라우저 탭의 메모리에만 남아 새로고침하면 사라집니다.
 
 **실제 사내 데이터를 외부 Jev API로 전송하기 전에 조직의 개인정보·정보보안 검토가 필요합니다.** 본 MVP는 입력 원문·키를 서버 로그에 기록하지 않습니다. 원문을 기록할 수 있는 SDK logger도 비활성화했습니다. 질의 목록은 React 메모리에만 있으며 DB, 파일, localStorage 또는 sessionStorage에 저장하지 않습니다. 응답에는 `Cache-Control: no-store`를 설정합니다.
 

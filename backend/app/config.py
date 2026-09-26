@@ -12,12 +12,16 @@ class Settings:
     api_key: str = field(default="", repr=False)
     discord_webhook_url: str = field(default="", repr=False)
     low_confidence_threshold: float = 0.60
+    deploy_mode: bool = False
+    demo_password: str = field(default="", repr=False)
 
     def __post_init__(self):
         if self.provider not in ("mock", "jev"):
             raise ValueError("PRIORITY_ANALYZER는 mock 또는 jev여야 합니다.")
         if not isfinite(self.low_confidence_threshold) or not 0 <= self.low_confidence_threshold <= 1:
             raise ValueError("LOW_CONFIDENCE_THRESHOLD는 0~1이어야 합니다.")
+        if self.deploy_mode and not self.demo_password:
+            raise ValueError("DEPLOY_MODE에서는 DEMO_PASSWORD가 필요합니다.")
         if self.discord_webhook_url:
             url = urlsplit(self.discord_webhook_url)
             if (url.scheme != "https" or url.netloc != "discord.com" or
@@ -26,9 +30,14 @@ class Settings:
 
     @classmethod
     def from_env(cls):
+        deploy_mode = os.getenv("DEPLOY_MODE", "0").strip()
+        if deploy_mode not in ("0", "1"):
+            raise ValueError("DEPLOY_MODE는 0 또는 1이어야 합니다.")
         return cls(
             provider=os.getenv("PRIORITY_ANALYZER", "mock").strip(),
             api_key=os.getenv("TYPESAFE_API_KEY", "").strip(),
             discord_webhook_url=os.getenv("DISCORD_WEBHOOK_URL", "").strip(),
             low_confidence_threshold=float(os.getenv("LOW_CONFIDENCE_THRESHOLD", "0.60")),
+            deploy_mode=deploy_mode == "1",
+            demo_password=os.getenv("DEMO_PASSWORD", ""),
         )

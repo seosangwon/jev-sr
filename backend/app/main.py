@@ -1,8 +1,13 @@
 import asyncio
+import base64
+import binascii
+import secrets
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from .config import Settings
 from .models import AnalysisRequest, AnalysisResponse, HandlingPriority, PostInput
@@ -11,6 +16,22 @@ from .providers import AnalysisError, JevPriorityAnalyzer, JevRuleMatcher, MockP
 
 
 RULE_MATCH_THRESHOLD = 0.8
+FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend/dist"
+
+
+def authorized(request: Request, password: str) -> bool:
+    scheme, _, encoded = request.headers.get("Authorization", "").partition(" ")
+    if scheme.lower() != "basic" or not encoded:
+        return False
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+        username, supplied_password = raw.split(b":", 1)
+    except (ValueError, binascii.Error):
+        return False
+    return bool(
+        secrets.compare_digest(username, b"demo")
+        & secrets.compare_digest(supplied_password, password.encode("utf-8"))
+    )
 
 
 def create_app(settings: Settings | None = None, analyzer: PriorityAnalyzer | None = None, rule_matcher: RuleMatcher | None = None, notifier: Notifier | None = None) -> FastAPI:
@@ -22,9 +43,16 @@ def create_app(settings: Settings | None = None, analyzer: PriorityAnalyzer | No
 
     @app.middleware("http")
     async def no_store(request: Request, call_next):
-        response = await call_next(request)
+        if settings.deploy_mode and request.url.path != "/healthz" and not authorized(request, settings.demo_password):
+            response = Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="Jev SR Demo"'})
+        else:
+            response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
         return response
+
+    @app.get("/healthz", include_in_schema=False)
+    async def healthz():
+        return {"status": "ok"}
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
@@ -78,6 +106,11 @@ def create_app(settings: Settings | None = None, analyzer: PriorityAnalyzer | No
                 sent = False
             notification_status = "sent" if sent else "failed"
         return AnalysisResponse(**original.model_dump(), handlingPriority=handling, notificationStatus=notification_status)
+
+    if settings.deploy_mode:
+        if not (FRONTEND_DIST / "index.html").is_file():
+            raise RuntimeError("DEPLOY_MODE에서는 빌드된 frontend/dist가 필요합니다.")
+        app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
 
     return app
 

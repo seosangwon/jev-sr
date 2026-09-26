@@ -102,3 +102,9 @@ Mock은 예제의 세 입력 필드를 비교하는 fixture 재생이다. 임의
 후속 요구로 Level 1 채널 알림을 추가했다. 기획서 완료 조건 21은 **통과**: 원래 Jev Level 1과 운영 규칙으로 상향된 처리 Level 1은 전송하고, 다른 Level과 실패 분석은 전송하지 않는 것을 백엔드 테스트로 확인했다. 전송 메시지는 제목·Level·사유·분석 시각만 포함하고 대상자 정보와 본문을 제외한다. `allowed_mentions.parse=[]`로 사용자 제목이 채널 멘션을 유발하지 않으며 Discord `wait=true` 응답의 메시지 ID로 성공을 확인한다. 웹훅 오류와 예외는 분석 결과를 취소하지 않고 `failed`로 표시한다. Mock 모드는 외부 전송 없이 `simulated`를 표시한다.
 
 최종 자동 검증: pytest **92개 통과**, Vitest **25개 통과**, TypeScript 타입 검사 **통과**, Vite 빌드 **통과**, Playwright Chromium **3개 통과**. 실제 Discord 전송도 로컬 `.env`의 웹훅으로 합성 Level 1 질의를 한 건 분석해 확인했다. HTTP 200, Jev/처리 Level 1, `notificationStatus: sent`를 확인했다. 웹훅 URL과 대상자 정보·본문은 채널 메시지에 포함하지 않았다. 최초 실제 요청은 Discord가 기본 Python User-Agent를 HTTP 403으로 거부해 `failed`였으며, 전용 User-Agent를 추가한 뒤 재검증에 성공했다.
+
+## Render 데모 배포 준비
+
+기획서 완료 조건 22의 로컬 검증은 **통과**했다. 배포 모드에서 암호가 없거나 프론트엔드 빌드가 없으면 시작을 거부한다. 화면·정적 자산·API·API 문서는 인증 전 401, 올바른 공유 암호로 200이고 `/healthz`는 공개 200이다. 로컬 개발 모드는 암호 없이 기존처럼 동작한다. `.env`는 `.dockerignore`와 `.gitignore`에서 제외된다.
+
+자동 검증: pytest **95개 통과**, Vitest **25개 통과**, TypeScript 타입 검사 **통과**, Vite 빌드 **통과**, Playwright Chromium **3개 통과**. Docker 이미지를 실제 빌드하고 Mock 모드 컨테이너를 실행해 인증 전후 HTTP 응답을 확인했다. Render 배포 주소에서의 Jev 실연결은 배포 완료 후 확인한다.
