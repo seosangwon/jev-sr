@@ -103,8 +103,10 @@ Mock은 예제의 세 입력 필드를 비교하는 fixture 재생이다. 임의
 
 최종 자동 검증: pytest **92개 통과**, Vitest **25개 통과**, TypeScript 타입 검사 **통과**, Vite 빌드 **통과**, Playwright Chromium **3개 통과**. 실제 Discord 전송도 로컬 `.env`의 웹훅으로 합성 Level 1 질의를 한 건 분석해 확인했다. HTTP 200, Jev/처리 Level 1, `notificationStatus: sent`를 확인했다. 웹훅 URL과 대상자 정보·본문은 채널 메시지에 포함하지 않았다. 최초 실제 요청은 Discord가 기본 Python User-Agent를 HTTP 403으로 거부해 `failed`였으며, 전용 User-Agent를 추가한 뒤 재검증에 성공했다.
 
-## Render 데모 배포 준비
+## Render 데모 배포
 
 기획서 완료 조건 22의 로컬 검증은 **통과**했다. 배포 모드에서 암호가 없거나 프론트엔드 빌드가 없으면 시작을 거부한다. 화면·정적 자산·API·API 문서는 인증 전 401, 올바른 공유 암호로 200이고 `/healthz`는 공개 200이다. 로컬 개발 모드는 암호 없이 기존처럼 동작한다. `.env`는 `.dockerignore`와 `.gitignore`에서 제외된다.
 
-자동 검증: pytest **95개 통과**, Vitest **25개 통과**, TypeScript 타입 검사 **통과**, Vite 빌드 **통과**, Playwright Chromium **3개 통과**. Docker 이미지를 실제 빌드하고 Mock 모드 컨테이너를 실행해 인증 전후 HTTP 응답을 확인했다. Render 배포 주소에서의 Jev 실연결은 배포 완료 후 확인한다.
+자동 검증: pytest **95개 통과**, Vitest **25개 통과**, TypeScript 타입 검사 **통과**, Vite 빌드 **통과**, Playwright Chromium **3개 통과**. Docker 이미지를 실제 빌드하고 Mock 모드 컨테이너를 실행해 인증 전후 HTTP 응답을 확인했다.
+
+실제 Render 무료 Docker 서비스는 `main`의 `dd0f28c` 커밋에서 빌드되어 **Live** 상태다. 배포 주소는 [jev-sr.onrender.com](https://jev-sr.onrender.com/)이다. 외부 요청에서 `/healthz`는 200, 인증하지 않은 `/`와 `/api/config`는 401을 반환했다. 사용자가 공유 암호로 접속해 합성 질의의 Jev 분석 결과를 확인했으며, Render 실행 로그에서도 `POST /api/analyze-priority`의 200 응답을 확인했다.
